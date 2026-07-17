@@ -1,0 +1,21 @@
+# Build
+/build/
+/out/
+/dist/
+*.exe
+*.pdb
+*.ilk
+*.obj
+*.lib
+*.exp
+
+# vcpkg
+/vcpkg_installed/
+
+# IDE
+.vs/
+.vscode/
+*.user
+CMakeSettings.json
+CMakeCache.txt
+CMakeFiles/

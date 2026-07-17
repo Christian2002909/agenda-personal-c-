@@ -1,0 +1,4 @@
+#include "src/resource.h"
+
+// Icono de la aplicacion (Explorador, barra de tareas, ventana y bandeja).
+IDI_APPICON ICON "assets/icon.ico"

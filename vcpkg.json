@@ -1,0 +1,11 @@
+{
+  "name": "agenda-personal",
+  "version": "1.0.0",
+  "description": "Agenda Personal nativa (C++/Direct3D 11) con efecto Liquid Glass",
+  "dependencies": [
+    {
+      "name": "curl",
+      "features": ["ssl"]
+    }
+  ]
+}
