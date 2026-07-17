@@ -3,6 +3,7 @@
 // Notification de Electron).
 
 #include <windows.h>
+#include <shellapi.h>
 #include <string>
 
 namespace agenda {
