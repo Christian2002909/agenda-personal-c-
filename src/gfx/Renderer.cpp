@@ -27,10 +27,12 @@ bool Renderer::init(HWND hwnd) {
     sd.Windowed = TRUE;
     sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
+    // Nota: NO se pide D3D11_CREATE_DEVICE_DEBUG aqui. Esa capa de depuracion
+    // requiere el componente opcional de Windows "Graphics Tools", que casi
+    // ningun usuario final tiene instalado; pedirla hace que TODO intento de
+    // creacion del dispositivo falle con DXGI_ERROR_SDK_COMPONENT_MISSING
+    // (0x887A002D), incluido el respaldo por software.
     UINT flags = 0;
-#ifdef _DEBUG
-    flags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
     const D3D_FEATURE_LEVEL niveles[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
     D3D_FEATURE_LEVEL nivelObtenido{};
 
