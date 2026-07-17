@@ -20,6 +20,95 @@ namespace agenda {
 
 static ImVec4 v4(const Col& c) { return ImVec4(c.r, c.g, c.b, c.a); }
 
+// ---------------------------------------------------------------------------
+// Selector de fecha (calendario emergente), en vez de escribir "AAAA-MM-DD" a mano.
+
+static int diasEnMes(int anio, int mes) {
+    static const int dias[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    int d = dias[mes-1];
+    if (mes == 2 && ((anio%4==0 && anio%100!=0) || anio%400==0)) d = 29;
+    return d;
+}
+
+// Dia de la semana (0=domingo..6=sabado) del dia 1 de ese mes.
+static int diaSemanaPrimero(int anio, int mes) {
+    std::tm t{}; t.tm_year=anio-1900; t.tm_mon=mes-1; t.tm_mday=1; t.tm_hour=12; t.tm_isdst=-1;
+    std::time_t tt = std::mktime(&t);
+    std::tm out{};
+#if defined(_WIN32)
+    localtime_s(&out, &tt);
+#else
+    localtime_r(&tt, &out);
+#endif
+    return out.tm_wday;
+}
+
+static const char* kMeses[] = {
+    "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+    "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
+};
+static const char* kDiasSemana[] = { "D","L","M","M","J","V","S" };
+
+// Boton que muestra la fecha elegida y abre un calendario emergente para cambiarla.
+// 'buf' contiene y recibe la fecha en formato "AAAA-MM-DD".
+static void selectorFecha(const char* id, char* buf, size_t bufSize) {
+    int y=0, m=0, d=0;
+    if (std::sscanf(buf, "%d-%d-%d", &y, &m, &d) != 3 || y < 1970) {
+        std::string hoy = hoyLocalYmd();
+        std::sscanf(hoy.c_str(), "%d-%d-%d", &y, &m, &d);
+    }
+
+    ImGui::PushID(id);
+    std::string etiqueta = buf[0] ? buf : "Elegir fecha...";
+    if (ImGui::Button(etiqueta.c_str(), ImVec2(-1, 0))) {
+        ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(240, 400));
+        ImGui::OpenPopup("calPopup");
+        // Guarda el mes que se muestra al abrir (mes actual de la fecha elegida).
+        ImGui::GetStateStorage()->SetInt(ImGui::GetID("navAnio"), y);
+        ImGui::GetStateStorage()->SetInt(ImGui::GetID("navMes"), m);
+    }
+    if (ImGui::BeginPopup("calPopup")) {
+        ImGuiStorage* st = ImGui::GetStateStorage();
+        int navAnio = st->GetInt(ImGui::GetID("navAnio"), y);
+        int navMes  = st->GetInt(ImGui::GetID("navMes"), m);
+
+        if (ImGui::SmallButton("<")) { navMes--; if (navMes < 1) { navMes = 12; navAnio--; } }
+        ImGui::SameLine(0, 8);
+        ImGui::Text("%s %d", kMeses[navMes-1], navAnio);
+        ImGui::SameLine(ImGui::GetWindowWidth() - 34);
+        if (ImGui::SmallButton(">")) { navMes++; if (navMes > 12) { navMes = 1; navAnio++; } }
+        st->SetInt(ImGui::GetID("navAnio"), navAnio);
+        st->SetInt(ImGui::GetID("navMes"), navMes);
+
+        ImGui::Spacing();
+        for (int i = 0; i < 7; ++i) {
+            ImGui::TextDisabled("%s", kDiasSemana[i]);
+            ImGui::SameLine(0, 0); ImGui::Dummy(ImVec2(26, 1)); ImGui::SameLine(0, 0);
+        }
+        ImGui::NewLine();
+
+        int primerDia = diaSemanaPrimero(navAnio, navMes);
+        int totalDias = diasEnMes(navAnio, navMes);
+        for (int i = 0; i < primerDia; ++i) {
+            ImGui::Dummy(ImVec2(28, 24));
+            ImGui::SameLine(0, 0);
+        }
+        for (int dia = 1; dia <= totalDias; ++dia) {
+            bool esElegido = (dia == d && navMes == m && navAnio == y);
+            char lbl[8]; std::snprintf(lbl, sizeof(lbl), "%d", dia);
+            if (esElegido) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            if (ImGui::Button(lbl, ImVec2(28, 24))) {
+                std::snprintf(buf, bufSize, "%04d-%02d-%02d", navAnio, navMes, dia);
+                ImGui::CloseCurrentPopup();
+            }
+            if (esElegido) ImGui::PopStyleColor();
+            if ((primerDia + dia) % 7 != 0) ImGui::SameLine(0, 0);
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::PopID();
+}
+
 static int diasRestantes(const std::string& ymd) {
     int Y=0,M=0,D=0; if (std::sscanf(ymd.c_str(), "%d-%d-%d", &Y,&M,&D) != 3) return 0;
     std::tm lt{}; std::time_t now = std::time(nullptr);
@@ -108,10 +197,16 @@ void UiApp::build(int width, int height, float timeSec) {
     st.PopupRounding = 16; st.GrabRounding = 8; st.WindowBorderSize = 0;
     st.WindowPadding = ImVec2(18, 18); st.FramePadding = ImVec2(10, 7);
     st.ItemSpacing = ImVec2(10, 10);
+    // Borde visible en campos/botones/popups: sin esto se pierden contra el
+    // fondo translucido del vidrio (todo se veia "plano").
+    st.FrameBorderSize = 1.0f;
+    st.PopupBorderSize = 1.0f;
     ImVec4* c = st.Colors;
     c[ImGuiCol_Text]           = v4(pal.fg);
     c[ImGuiCol_WindowBg]       = ImVec4(0,0,0,0);
     c[ImGuiCol_ChildBg]        = ImVec4(0,0,0,0);
+    c[ImGuiCol_Border]         = v4(pal.glassBorde);
+    c[ImGuiCol_BorderShadow]   = ImVec4(0,0,0,0);
     // Los desplegables (combos) son popups reales: fondo opaco para que se lean.
     c[ImGuiCol_PopupBg]        = pal.isDark ? ImVec4(0.12f,0.12f,0.15f,0.98f)
                                             : ImVec4(0.98f,0.98f,1.00f,0.98f);
@@ -566,8 +661,8 @@ void UiApp::modalTarea() {
     ImGui::TextUnformatted("Titulo");
     ImGui::PushItemWidth(-1);
     ImGui::InputTextWithHint("##titulo", "Que tienes que hacer?", inTitulo_, sizeof(inTitulo_));
-    ImGui::TextUnformatted("Fecha limite (ultimo dia)  [AAAA-MM-DD]");
-    ImGui::InputTextWithHint("##fecha", "2026-01-31", inFecha_, sizeof(inFecha_));
+    ImGui::TextUnformatted("Fecha limite (ultimo dia)");
+    selectorFecha("fecha", inFecha_, sizeof(inFecha_));
     ImGui::TextUnformatted("Notas");
     ImGui::InputTextMultiline("##notas", inNotas_, sizeof(inNotas_), ImVec2(-1, 70));
     ImGui::PopItemWidth();
