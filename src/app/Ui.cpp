@@ -60,7 +60,12 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize) {
 
     ImGui::PushID(id);
     std::string etiqueta = buf[0] ? buf : "Elegir fecha...";
-    if (ImGui::Button(etiqueta.c_str(), ImVec2(-1, 0))) {
+    // Alineado a la izquierda, como los demas campos de texto (el boton de
+    // ImGui centra el texto por defecto).
+    ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+    bool abrir = ImGui::Button(etiqueta.c_str(), ImVec2(-1, 0));
+    ImGui::PopStyleVar();
+    if (abrir) {
         ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(240, 400));
         ImGui::OpenPopup("calPopup");
         // Guarda el mes que se muestra al abrir (mes actual de la fecha elegida).
