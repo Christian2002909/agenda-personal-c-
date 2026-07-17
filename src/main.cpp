@@ -135,8 +135,22 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int) {
     if (!g_hwnd) return 1;
 
     if (!g_renderer.init(g_hwnd)) {
-        MessageBoxW(g_hwnd, L"No se pudo inicializar Direct3D 11.", L"Agenda Personal", MB_ICONERROR);
+        wchar_t msg[256];
+        swprintf_s(msg,
+            L"No se pudo inicializar Direct3D 11 (ni siquiera en modo por software).\n"
+            L"Codigo: 0x%08lX\n\n"
+            L"Verifica que Windows tenga los controladores de video actualizados.",
+            (unsigned long)g_renderer.ultimoError());
+        MessageBoxW(g_hwnd, msg, L"Agenda Personal", MB_ICONERROR);
         return 1;
+    }
+    if (g_renderer.usandoRespaldoPorSoftware()) {
+        MessageBoxW(g_hwnd,
+            L"No se encontro una tarjeta grafica compatible con Direct3D 11 "
+            L"(comun en maquinas virtuales o escritorio remoto).\n\n"
+            L"La app abrira usando un renderizador por software: funciona "
+            L"igual, pero se vera mas lenta.",
+            L"Agenda Personal", MB_ICONINFORMATION);
     }
 
     if (!g_glass.init(g_renderer.device(), g_renderer.context())) {
