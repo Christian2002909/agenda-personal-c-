@@ -1,4 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
+
+# Fuerza generar en 64 bits (por defecto los generadores de Visual Studio usan
+# Win32 si no se especifica, lo que produciria un .exe de 32 bits incompatible
+# con las DLLs de 64 bits que instala vcpkg). Debe fijarse antes de project().
+if(NOT CMAKE_GENERATOR_PLATFORM)
+  set(CMAKE_GENERATOR_PLATFORM x64)
+endif()
+
 project(AgendaPersonal LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------
