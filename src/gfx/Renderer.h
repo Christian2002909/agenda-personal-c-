@@ -25,6 +25,10 @@ public:
     UINT width()  const { return w_; }
     UINT height() const { return h_; }
 
+    // true si no se encontro una GPU compatible y se uso el respaldo por software (WARP).
+    bool usandoRespaldoPorSoftware() const { return usandoWarp_; }
+    long ultimoError() const { return ultimoError_; }
+
 private:
     void createRTV();
 
@@ -34,6 +38,8 @@ private:
     ComPtr<ID3D11RenderTargetView> rtv_;
     HWND hwnd_ = nullptr;
     UINT w_ = 0, h_ = 0;
+    bool usandoWarp_ = false;
+    long ultimoError_ = 0;
 };
 
 } // namespace agenda

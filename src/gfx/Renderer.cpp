@@ -34,21 +34,24 @@ bool Renderer::init(HWND hwnd) {
     const D3D_FEATURE_LEVEL niveles[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
     D3D_FEATURE_LEVEL nivelObtenido{};
 
-    HRESULT hr = D3D11CreateDeviceAndSwapChain(
-        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
-        niveles, static_cast<UINT>(std::size(niveles)), D3D11_SDK_VERSION,
-        &sd, &swap_, &device_, &nivelObtenido, &ctx_);
-
-    if (FAILED(hr)) {
-        // Reintento con SwapEffect clasico por si el flip model no esta soportado.
-        sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-        sd.BufferCount = 1;
-        hr = D3D11CreateDeviceAndSwapChain(
-            nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
+    auto intentar = [&](D3D_DRIVER_TYPE tipo, DXGI_SWAP_EFFECT efecto, UINT buffers) -> HRESULT {
+        sd.SwapEffect = efecto;
+        sd.BufferCount = buffers;
+        swap_.Reset(); device_.Reset(); ctx_.Reset();
+        return D3D11CreateDeviceAndSwapChain(
+            nullptr, tipo, nullptr, flags,
             niveles, static_cast<UINT>(std::size(niveles)), D3D11_SDK_VERSION,
             &sd, &swap_, &device_, &nivelObtenido, &ctx_);
-    }
-    if (FAILED(hr)) return false;
+    };
+
+    // 1) GPU real, swap chain moderna. 2) GPU real, swap chain clasica (por si
+    // el modelo "flip" no esta soportado). 3) Respaldo por software (WARP):
+    // funciona en cualquier Windows sin GPU compatible (VMs, RDP, hardware muy
+    // viejo), mas lento pero garantiza que la app abra.
+    HRESULT hr = intentar(D3D_DRIVER_TYPE_HARDWARE, DXGI_SWAP_EFFECT_FLIP_DISCARD, 2);
+    if (FAILED(hr)) hr = intentar(D3D_DRIVER_TYPE_HARDWARE, DXGI_SWAP_EFFECT_DISCARD, 1);
+    if (FAILED(hr)) { hr = intentar(D3D_DRIVER_TYPE_WARP, DXGI_SWAP_EFFECT_DISCARD, 1); usandoWarp_ = SUCCEEDED(hr); }
+    if (FAILED(hr)) { ultimoError_ = hr; return false; }
 
     createRTV();
     return true;
