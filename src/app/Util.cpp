@@ -9,9 +9,14 @@
 namespace agenda {
 
 std::string generarId() {
-    static thread_local std::mt19937_64 rng(
-        static_cast<uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) ^
-        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&rng)));
+    // La semilla combina el reloj con el id de hilo (evita colisiones entre hilos
+    // sin referenciar la propia variable durante su inicializacion, que MSVC rechaza).
+    static thread_local std::mt19937_64 rng([] {
+        uint64_t seed = static_cast<uint64_t>(
+            std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        seed ^= static_cast<uint64_t>(GetCurrentThreadId()) << 32;
+        return seed;
+    }());
     uint64_t a = rng();
     uint64_t b = rng();
     char buf[40];
