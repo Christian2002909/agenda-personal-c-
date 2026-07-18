@@ -222,7 +222,7 @@ void UiApp::build(int width, int height, float timeSec) {
     ImGuiStyle& st = ImGui::GetStyle();
     st.WindowRounding = 20; st.ChildRounding = 18; st.FrameRounding = 9;
     st.PopupRounding = 16; st.GrabRounding = 8; st.WindowBorderSize = 0;
-    st.WindowPadding = ImVec2(18, 18); st.FramePadding = ImVec2(10, 7);
+    st.WindowPadding = ImVec2(18, 18); st.FramePadding = ImVec2(10, 6);
     st.ItemSpacing = ImVec2(10, 10);
     // Borde visible en campos/botones/popups: sin esto se pierden contra el
     // fondo translucido del vidrio (todo se veia "plano").
@@ -534,7 +534,11 @@ static bool comboStr(const char* label, std::string& valor, const char* const* i
     int idx = 0;
     for (int i = 0; i < n; ++i) if (valor == valores[i]) idx = i;
     bool changed = false;
-    if (ImGui::Combo(label, &idx, items, n)) { valor = valores[idx]; changed = true; }
+    ImGui::TextUnformatted(label);
+    std::string idLabel = std::string("##") + label;
+    ImGui::PushItemWidth(-1);
+    if (ImGui::Combo(idLabel.c_str(), &idx, items, n)) { valor = valores[idx]; changed = true; }
+    ImGui::PopItemWidth();
     return changed;
 }
 
@@ -596,7 +600,10 @@ void UiApp::vistaConfig() {
     grupo("Canales de aviso", [&]{
         ImGui::Checkbox("Notificacion de Windows (se repite cada 5 min hasta completar)", &config_.notificaciones.ventana);
         ImGui::Checkbox("Aviso por correo electronico", &config_.notificaciones.correo);
-        ImGui::InputInt("Correccion horaria (minutos)", &config_.correccionHorariaMin, 0, 0);
+        ImGui::TextUnformatted("Correccion horaria (minutos)");
+        ImGui::PushItemWidth(-1);
+        ImGui::InputInt("##correccionHoraria", &config_.correccionHorariaMin, 0, 0);
+        ImGui::PopItemWidth();
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 500.0f);
         ImGui::TextDisabled("Si los avisos llegan tarde/temprano por zona horaria, ajusta aqui (ej. 60 o -60).");
         ImGui::PopTextWrapPos();
@@ -604,12 +611,24 @@ void UiApp::vistaConfig() {
 
     grupo("Avisos por correo", [&]{
         char dir[256]; strncpy_s(dir, config_.email.direccion.c_str(), _TRUNCATE);
-        if (ImGui::InputText("Correo electronico", dir, sizeof(dir))) config_.email.direccion = dir;
+        ImGui::TextUnformatted("Correo electronico");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##correoElectronico", dir, sizeof(dir))) config_.email.direccion = dir;
+        ImGui::PopItemWidth();
         char pass[256]; strncpy_s(pass, config_.email.appPassword.c_str(), _TRUNCATE);
-        if (ImGui::InputText("Contrasena de aplicacion", pass, sizeof(pass), ImGuiInputTextFlags_Password)) config_.email.appPassword = pass;
+        ImGui::TextUnformatted("Contrasena de aplicacion");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##passEmail", pass, sizeof(pass), ImGuiInputTextFlags_Password)) config_.email.appPassword = pass;
+        ImGui::PopItemWidth();
         char host[128]; strncpy_s(host, config_.email.smtpHost.c_str(), _TRUNCATE);
-        if (ImGui::InputText("Servidor SMTP", host, sizeof(host))) config_.email.smtpHost = host;
-        ImGui::InputInt("Puerto SMTP", &config_.email.smtpPort, 0, 0);
+        ImGui::TextUnformatted("Servidor SMTP");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##smtpHost", host, sizeof(host))) config_.email.smtpHost = host;
+        ImGui::PopItemWidth();
+        ImGui::TextUnformatted("Puerto SMTP");
+        ImGui::PushItemWidth(-1);
+        ImGui::InputInt("##smtpPort", &config_.email.smtpPort, 0, 0);
+        ImGui::PopItemWidth();
         if (ImGui::Button("Probar correo")) {
             guardarConfig(true);
             setEstado("Enviando correo de prueba...");
@@ -636,9 +655,15 @@ void UiApp::vistaConfig() {
         ImGui::TextDisabled("Este es el canal que llega a tu celular via Google Calendar.");
         ImGui::PopTextWrapPos();
         char cid[256]; strncpy_s(cid, config_.googleCalendar.clientId.c_str(), _TRUNCATE);
-        if (ImGui::InputText("Client ID", cid, sizeof(cid))) config_.googleCalendar.clientId = cid;
+        ImGui::TextUnformatted("Client ID");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##clientId", cid, sizeof(cid))) config_.googleCalendar.clientId = cid;
+        ImGui::PopItemWidth();
         char cs[256]; strncpy_s(cs, config_.googleCalendar.clientSecret.c_str(), _TRUNCATE);
-        if (ImGui::InputText("Client Secret", cs, sizeof(cs))) config_.googleCalendar.clientSecret = cs;
+        ImGui::TextUnformatted("Client Secret");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##clientSecret", cs, sizeof(cs))) config_.googleCalendar.clientSecret = cs;
+        ImGui::PopItemWidth();
         if (ImGui::Button("Conectar con Google")) {
             guardarConfig(true);
             setEstado("Conectando... revisa el navegador");
@@ -661,9 +686,15 @@ void UiApp::vistaConfig() {
 
     grupo("Sincronizacion con Apple Reminders / iCloud (opcional)", [&]{
         char aid[256]; strncpy_s(aid, config_.icloudReminders.appleId.c_str(), _TRUNCATE);
-        if (ImGui::InputText("Apple ID", aid, sizeof(aid))) config_.icloudReminders.appleId = aid;
+        ImGui::TextUnformatted("Apple ID");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##appleId", aid, sizeof(aid))) config_.icloudReminders.appleId = aid;
+        ImGui::PopItemWidth();
         char ap[256]; strncpy_s(ap, config_.icloudReminders.appPassword.c_str(), _TRUNCATE);
-        if (ImGui::InputText("Contrasena de aplicacion", ap, sizeof(ap), ImGuiInputTextFlags_Password)) config_.icloudReminders.appPassword = ap;
+        ImGui::TextUnformatted("Contrasena de aplicacion");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##passIcloud", ap, sizeof(ap), ImGuiInputTextFlags_Password)) config_.icloudReminders.appPassword = ap;
+        ImGui::PopItemWidth();
         ImGui::Checkbox("Activar sincronizacion con iCloud", &config_.icloudReminders.activo);
     });
 
@@ -671,7 +702,7 @@ void UiApp::vistaConfig() {
 
     ImGui::PushStyleColor(ImGuiCol_Button, v4(pal.accent));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,1,1,1));
-    if (ImGui::Button("Guardar configuracion", ImVec2(220, 0))) guardarConfig(false);
+    if (ImGui::Button("Guardar configuracion")) guardarConfig(false);
     ImGui::PopStyleColor(2);
 }
 
