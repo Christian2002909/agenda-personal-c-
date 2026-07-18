@@ -229,7 +229,7 @@ void UiApp::build(int width, int height, float timeSec) {
     st.WindowRounding = 20; st.ChildRounding = 18; st.FrameRounding = 10;
     st.PopupRounding = 16; st.GrabRounding = 8; st.WindowBorderSize = 0;
     st.WindowPadding = ImVec2(16, 14); st.FramePadding = ImVec2(8, 5);
-    st.ItemSpacing = ImVec2(8, 6);
+    st.ItemSpacing = ImVec2(8, 9);
     // Borde visible en campos/botones/popups: sin esto se pierden contra el
     // fondo translucido del vidrio (todo se veia "plano").
     st.FrameBorderSize = 1.0f;
@@ -542,54 +542,13 @@ void UiApp::vistaHistorial() {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers de centrado para la vista de Configuracion: todo (titulos, etiquetas
-// y cajas) queda centrado horizontalmente dentro del area disponible.
-static const float kCampoW = 360.0f;
-static void centrarAncho(float w) {
-    float avail = ImGui::GetContentRegionAvail().x;
-    if (w < avail) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - w) * 0.5f);
-}
-static void textoCentrado(const char* txt) {
-    centrarAncho(ImGui::CalcTextSize(txt).x);
-    ImGui::TextUnformatted(txt);
-}
-static bool checkCentrado(const char* txt, bool* v) {
-    ImGuiStyle& st = ImGui::GetStyle();
-    float w = ImGui::GetFrameHeight() + st.ItemInnerSpacing.x + ImGui::CalcTextSize(txt).x;
-    centrarAncho(w);
-    return ImGui::Checkbox(txt, v);
-}
-static bool botonCentrado(const char* txt) {
-    ImGuiStyle& st = ImGui::GetStyle();
-    float w = ImGui::CalcTextSize(txt).x + st.FramePadding.x * 2.0f;
-    centrarAncho(w);
-    return ImGui::Button(txt);
-}
-static bool inputCentrado(const char* label, const char* id, char* buf, size_t sz, ImGuiInputTextFlags flags = 0) {
-    textoCentrado(label);
-    centrarAncho(kCampoW);
-    ImGui::PushItemWidth(kCampoW);
-    bool ch = ImGui::InputText(id, buf, sz, flags);
-    ImGui::PopItemWidth();
-    return ch;
-}
-static void inputIntCentrado(const char* label, const char* id, int* v) {
-    textoCentrado(label);
-    centrarAncho(kCampoW);
-    ImGui::PushItemWidth(kCampoW);
-    ImGui::InputInt(id, v, 0, 0);
-    ImGui::PopItemWidth();
-}
-
-// ---------------------------------------------------------------------------
 static bool comboStr(const char* label, std::string& valor, const char* const* items, const char* const* valores, int n) {
     int idx = 0;
     for (int i = 0; i < n; ++i) if (valor == valores[i]) idx = i;
     bool changed = false;
-    textoCentrado(label);
+    ImGui::TextUnformatted(label);
     std::string idLabel = std::string("##") + label;
-    centrarAncho(kCampoW);
-    ImGui::PushItemWidth(kCampoW);
+    ImGui::PushItemWidth(-1);
     // BeginCombo sin flecha default para dibujar un chevron mas pequeno.
     if (ImGui::BeginCombo(idLabel.c_str(), items[idx], ImGuiComboFlags_NoArrowButton)) {
         for (int i = 0; i < n; ++i) {
@@ -621,23 +580,33 @@ static bool comboStr(const char* label, std::string& valor, const char* const* i
 void UiApp::vistaConfig() {
     ThemePalette pal = resolverPaleta(config_);
     auto grupo = [&](const char* titulo, std::function<void()> cuerpo) {
-        centrarAncho(540.0f); // centra el panel completo en el area de contenido
-        ImGui::BeginChild(titulo, ImVec2(540, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoScrollbar);
+        // Relleno interno generoso: que titulos/etiquetas/botones no queden
+        // pegados a la esquina del panel (antes usaban el WindowPadding global 16,14).
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28, 22));
+        // AlwaysUseWindowPadding: sin esta bandera, un child SIN borde ignora el
+        // WindowPadding y el contenido queda pegado a la esquina del panel.
+        ImGui::BeginChild(titulo, ImVec2(540, 0),
+            ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding,
+            ImGuiWindowFlags_NoScrollbar);
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
         registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
-        ImGui::SetWindowFontScale(1.12f);
-        textoCentrado(titulo);
+        // Titulo del panel mas grande/prominente y con aire debajo, como en la
+        // version original (Electron).
+        ImGui::SetWindowFontScale(1.30f);
+        ImGui::TextUnformatted(titulo);
         ImGui::SetWindowFontScale(1.0f);
-        ImGui::Spacing();
+        ImGui::Dummy(ImVec2(0, 8)); // aire entre el titulo del panel y el primer campo
         cuerpo();
         ImGui::EndChild();
-        ImGui::Dummy(ImVec2(0, 10)); // mas separacion visual entre paneles
+        ImGui::PopStyleVar();
+        ImGui::Dummy(ImVec2(0, 14)); // mas separacion visual entre paneles
     };
 
-    ImGui::SetWindowFontScale(1.3f);
-    textoCentrado("Configuracion");
+    ImGui::Dummy(ImVec2(0, 4)); // pequeno margen superior para el titulo de la pagina
+    ImGui::SetWindowFontScale(1.45f);
+    ImGui::TextUnformatted("Configuracion");
     ImGui::SetWindowFontScale(1.0f);
-    ImGui::Spacing();
+    ImGui::Dummy(ImVec2(0, 6));
 
     ImGui::PushItemWidth(300);
 
@@ -659,7 +628,6 @@ void UiApp::vistaConfig() {
             if (config_.fondo.valor.size() >= 7 && config_.fondo.valor[0]=='#')
                 rgb = (unsigned int)strtoul(config_.fondo.valor.c_str()+1, nullptr, 16);
             col[0]=((rgb>>16)&0xFF)/255.0f; col[1]=((rgb>>8)&0xFF)/255.0f; col[2]=(rgb&0xFF)/255.0f;
-            centrarAncho(ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize("Color de fondo").x);
             if (ImGui::ColorEdit3("Color de fondo", col, ImGuiColorEditFlags_NoInputs)) {
                 char hexs[8]; std::snprintf(hexs, sizeof(hexs), "#%02x%02x%02x",
                     (int)(col[0]*255), (int)(col[1]*255), (int)(col[2]*255));
@@ -667,7 +635,7 @@ void UiApp::vistaConfig() {
             }
         }
         if (config_.fondo.tipo == "imagen") {
-            if (botonCentrado("Elegir imagen de fondo")) {
+            if (ImGui::Button("Elegir imagen de fondo")) {
                 std::wstring ruta = elegirImagen(hwnd_);
                 if (!ruta.empty()) config_.fondo.valor = narrow(ruta);
             }
@@ -676,9 +644,12 @@ void UiApp::vistaConfig() {
     });
 
     grupo("Canales de aviso", [&]{
-        checkCentrado("Notificacion de Windows (se repite cada 5 min hasta completar)", &config_.notificaciones.ventana);
-        checkCentrado("Aviso por correo electronico", &config_.notificaciones.correo);
-        inputIntCentrado("Correccion horaria (minutos)", "##correccionHoraria", &config_.correccionHorariaMin);
+        ImGui::Checkbox("Notificacion de Windows (se repite cada 5 min hasta completar)", &config_.notificaciones.ventana);
+        ImGui::Checkbox("Aviso por correo electronico", &config_.notificaciones.correo);
+        ImGui::TextUnformatted("Correccion horaria (minutos)");
+        ImGui::PushItemWidth(-1);
+        ImGui::InputInt("##correccionHoraria", &config_.correccionHorariaMin, 0, 0);
+        ImGui::PopItemWidth();
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 500.0f);
         ImGui::TextDisabled("Si los avisos llegan tarde/temprano por zona horaria, ajusta aqui (ej. 60 o -60).");
         ImGui::PopTextWrapPos();
@@ -686,19 +657,24 @@ void UiApp::vistaConfig() {
 
     grupo("Avisos por correo", [&]{
         char dir[256]; strncpy_s(dir, config_.email.direccion.c_str(), _TRUNCATE);
-        if (inputCentrado("Correo electronico", "##correoElectronico", dir, sizeof(dir))) config_.email.direccion = dir;
+        ImGui::TextUnformatted("Correo electronico");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##correoElectronico", dir, sizeof(dir))) config_.email.direccion = dir;
+        ImGui::PopItemWidth();
         char pass[256]; strncpy_s(pass, config_.email.appPassword.c_str(), _TRUNCATE);
-        if (inputCentrado("Contrasena de aplicacion", "##passEmail", pass, sizeof(pass), ImGuiInputTextFlags_Password)) config_.email.appPassword = pass;
+        ImGui::TextUnformatted("Contrasena de aplicacion");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##passEmail", pass, sizeof(pass), ImGuiInputTextFlags_Password)) config_.email.appPassword = pass;
+        ImGui::PopItemWidth();
         char host[128]; strncpy_s(host, config_.email.smtpHost.c_str(), _TRUNCATE);
-        if (inputCentrado("Servidor SMTP", "##smtpHost", host, sizeof(host))) config_.email.smtpHost = host;
-        inputIntCentrado("Puerto SMTP", "##smtpPort", &config_.email.smtpPort);
-        // Par de botones centrado como grupo.
-        {
-            ImGuiStyle& st = ImGui::GetStyle();
-            float w1 = ImGui::CalcTextSize("Probar correo").x + st.FramePadding.x * 2.0f;
-            float w2 = ImGui::CalcTextSize("Probar notificacion").x + st.FramePadding.x * 2.0f;
-            centrarAncho(w1 + st.ItemSpacing.x + w2);
-        }
+        ImGui::TextUnformatted("Servidor SMTP");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##smtpHost", host, sizeof(host))) config_.email.smtpHost = host;
+        ImGui::PopItemWidth();
+        ImGui::TextUnformatted("Puerto SMTP");
+        ImGui::PushItemWidth(-1);
+        ImGui::InputInt("##smtpPort", &config_.email.smtpPort, 0, 0);
+        ImGui::PopItemWidth();
         if (ImGui::Button("Probar correo")) {
             guardarConfig(true);
             setEstado("Enviando correo de prueba...");
@@ -715,7 +691,7 @@ void UiApp::vistaConfig() {
     });
 
     grupo("Inicio", [&]{
-        if (checkCentrado("Iniciar Agenda Personal con Windows", &config_.iniciarConWindows)) {
+        if (ImGui::Checkbox("Iniciar Agenda Personal con Windows", &config_.iniciarConWindows)) {
             if (onAutostart) onAutostart(config_.iniciarConWindows);
         }
     });
@@ -725,10 +701,16 @@ void UiApp::vistaConfig() {
         ImGui::TextDisabled("Este es el canal que llega a tu celular via Google Calendar.");
         ImGui::PopTextWrapPos();
         char cid[256]; strncpy_s(cid, config_.googleCalendar.clientId.c_str(), _TRUNCATE);
-        if (inputCentrado("Client ID", "##clientId", cid, sizeof(cid))) config_.googleCalendar.clientId = cid;
+        ImGui::TextUnformatted("Client ID");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##clientId", cid, sizeof(cid))) config_.googleCalendar.clientId = cid;
+        ImGui::PopItemWidth();
         char cs[256]; strncpy_s(cs, config_.googleCalendar.clientSecret.c_str(), _TRUNCATE);
-        if (inputCentrado("Client Secret", "##clientSecret", cs, sizeof(cs))) config_.googleCalendar.clientSecret = cs;
-        if (botonCentrado("Conectar con Google")) {
+        ImGui::TextUnformatted("Client Secret");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##clientSecret", cs, sizeof(cs))) config_.googleCalendar.clientSecret = cs;
+        ImGui::PopItemWidth();
+        if (ImGui::Button("Conectar con Google")) {
             guardarConfig(true);
             setEstado("Conectando... revisa el navegador");
             std::thread([this]{
@@ -745,22 +727,28 @@ void UiApp::vistaConfig() {
         }
         ImGui::SameLine();
         ImGui::TextUnformatted(config_.googleCalendar.tokens.valido ? "Conectado" : "No conectado");
-        checkCentrado("Activar sincronizacion con Google Calendar", &config_.googleCalendar.activo);
+        ImGui::Checkbox("Activar sincronizacion con Google Calendar", &config_.googleCalendar.activo);
     });
 
     grupo("Sincronizacion con Apple Reminders / iCloud (opcional)", [&]{
         char aid[256]; strncpy_s(aid, config_.icloudReminders.appleId.c_str(), _TRUNCATE);
-        if (inputCentrado("Apple ID", "##appleId", aid, sizeof(aid))) config_.icloudReminders.appleId = aid;
+        ImGui::TextUnformatted("Apple ID");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##appleId", aid, sizeof(aid))) config_.icloudReminders.appleId = aid;
+        ImGui::PopItemWidth();
         char ap[256]; strncpy_s(ap, config_.icloudReminders.appPassword.c_str(), _TRUNCATE);
-        if (inputCentrado("Contrasena de aplicacion", "##passIcloud", ap, sizeof(ap), ImGuiInputTextFlags_Password)) config_.icloudReminders.appPassword = ap;
-        checkCentrado("Activar sincronizacion con iCloud", &config_.icloudReminders.activo);
+        ImGui::TextUnformatted("Contrasena de aplicacion");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::InputText("##passIcloud", ap, sizeof(ap), ImGuiInputTextFlags_Password)) config_.icloudReminders.appPassword = ap;
+        ImGui::PopItemWidth();
+        ImGui::Checkbox("Activar sincronizacion con iCloud", &config_.icloudReminders.activo);
     });
 
     ImGui::PopItemWidth();
 
     ImGui::PushStyleColor(ImGuiCol_Button, v4(pal.accent));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,1,1,1));
-    if (botonCentrado("Guardar configuracion")) guardarConfig(false);
+    if (ImGui::Button("Guardar configuracion")) guardarConfig(false);
     ImGui::PopStyleColor(2);
 }
 
