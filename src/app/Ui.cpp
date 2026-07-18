@@ -229,7 +229,7 @@ void UiApp::build(int width, int height, float timeSec) {
     st.WindowRounding = 20; st.ChildRounding = 18; st.FrameRounding = 10;
     st.PopupRounding = 16; st.GrabRounding = 8; st.WindowBorderSize = 0;
     st.WindowPadding = ImVec2(16, 14); st.FramePadding = ImVec2(8, 5);
-    st.ItemSpacing = ImVec2(8, 6);
+    st.ItemSpacing = ImVec2(8, 9);
     // Borde visible en campos/botones/popups: sin esto se pierden contra el
     // fondo translucido del vidrio (todo se veia "plano").
     st.FrameBorderSize = 1.0f;
@@ -589,7 +589,7 @@ void UiApp::vistaConfig() {
         ImGui::Spacing();
         cuerpo();
         ImGui::EndChild();
-        ImGui::Dummy(ImVec2(0, 10)); // mas separacion visual entre paneles
+        ImGui::Dummy(ImVec2(0, 14)); // mas separacion visual entre paneles
     };
 
     ImGui::SetWindowFontScale(1.3f);

@@ -65,13 +65,15 @@ ThemePalette resolverPaleta(const Config& cfg) {
     if (!p.isDark) {
         p.bg        = hex(0xeef0f7);
         p.fg        = hex(0x1d1d24);
-        p.panelSolid= rgba(255,255,255,0.55f);
-        p.inputBg   = rgba(255,255,255,0.70f);
+        p.panelSolid= rgba(255,255,255,0.62f);
+        p.inputBg   = rgba(255,255,255,0.88f);
         p.hoverBg   = rgba(0,0,0,0.05f);
-        p.borde     = rgba(0,0,0,0.12f);
-        p.glassBg   = rgba(255,255,255,0.28f);
-        p.glassBorde= rgba(255,255,255,0.55f);
-        p.glassRim  = rgba(255,255,255,0.65f);
+        p.borde     = rgba(0,0,0,0.14f);
+        // Panel de vidrio bastante mas definido sobre el degradado por defecto
+        // (antes 0.28 se veia "lavado" y se fundia con el fondo).
+        p.glassBg   = rgba(255,255,255,0.55f);
+        p.glassBorde= rgba(255,255,255,0.72f);
+        p.glassRim  = rgba(255,255,255,0.78f);
     } else {
         p.bg        = hex(0x12121a);
         p.fg        = hex(0xeceef5);
@@ -79,7 +81,7 @@ ThemePalette resolverPaleta(const Config& cfg) {
         p.inputBg   = rgba(255,255,255,0.08f);
         p.hoverBg   = rgba(255,255,255,0.08f);
         p.borde     = rgba(255,255,255,0.14f);
-        p.glassBg   = rgba(40,42,60,0.35f);
+        p.glassBg   = rgba(40,42,60,0.50f);
         p.glassBorde= rgba(255,255,255,0.16f);
         p.glassRim  = rgba(255,255,255,0.35f);
     }
