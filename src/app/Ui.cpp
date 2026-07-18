@@ -50,8 +50,11 @@ static const char* kMeses[] = {
 static const char* kDiasSemana[] = { "D","L","M","M","J","V","S" };
 
 // Boton que muestra la fecha elegida y abre un calendario emergente para cambiarla.
-// 'buf' contiene y recibe la fecha en formato "AAAA-MM-DD".
-static void selectorFecha(const char* id, char* buf, size_t bufSize) {
+// 'buf' contiene y recibe la fecha en formato "AAAA-MM-DD". Se dibuja con el
+// mismo estilo que los demas campos de texto (no como un boton solido), con un
+// icono de calendario a la derecha, para que se vea como un campo de fecha
+// normal (igual que el <input type="date"> del original).
+static void selectorFecha(const char* id, char* buf, size_t bufSize, const ThemePalette& pal) {
     int y=0, m=0, d=0;
     if (std::sscanf(buf, "%d-%d-%d", &y, &m, &d) != 3 || y < 1970) {
         std::string hoy = hoyLocalYmd();
@@ -59,8 +62,32 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize) {
     }
 
     ImGui::PushID(id);
-    std::string etiqueta = buf[0] ? buf : "Elegir fecha...";
-    if (ImGui::Button(etiqueta.c_str(), ImVec2(-1, 0))) {
+    std::string etiqueta = buf[0] ? buf : "aaaa-mm-dd";
+    // Mismo look que un campo de texto (fondo/borde de input), no un boton solido.
+    ImGui::PushStyleColor(ImGuiCol_Button, v4(pal.inputBg));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(pal.hoverBg));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, v4(pal.inputBg));
+    ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+    bool abrir = ImGui::Button(etiqueta.c_str(), ImVec2(-1, 0));
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(3);
+
+    // Icono de calendario a la derecha del campo.
+    {
+        ImVec2 mn = ImGui::GetItemRectMin();
+        ImVec2 mx = ImGui::GetItemRectMax();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const float s = 15.0f;
+        ImVec2 iMin(mx.x - s - 12.0f, mn.y + (mx.y - mn.y - s) * 0.5f);
+        ImVec2 iMax(iMin.x + s, iMin.y + s);
+        ImU32 colIcon = ImGui::ColorConvertFloat4ToU32(v4(pal.fgDim));
+        dl->AddRect(iMin, iMax, colIcon, 2.5f, 0, 1.3f);
+        dl->AddLine(ImVec2(iMin.x, iMin.y + 4.5f), ImVec2(iMax.x, iMin.y + 4.5f), colIcon, 1.3f);
+        dl->AddLine(ImVec2(iMin.x + s * 0.28f, iMin.y - 2.0f), ImVec2(iMin.x + s * 0.28f, iMin.y + 2.5f), colIcon, 1.5f);
+        dl->AddLine(ImVec2(iMax.x - s * 0.28f, iMin.y - 2.0f), ImVec2(iMax.x - s * 0.28f, iMin.y + 2.5f), colIcon, 1.5f);
+    }
+
+    if (abrir) {
         ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(240, 400));
         ImGui::OpenPopup("calPopup");
         // Guarda el mes que se muestra al abrir (mes actual de la fecha elegida).
@@ -207,6 +234,7 @@ void UiApp::build(int width, int height, float timeSec) {
     c[ImGuiCol_ChildBg]        = ImVec4(0,0,0,0);
     c[ImGuiCol_Border]         = v4(pal.glassBorde);
     c[ImGuiCol_BorderShadow]   = ImVec4(0,0,0,0);
+    c[ImGuiCol_TextDisabled]   = v4(pal.fgDim);
     // Los desplegables (combos) son popups reales: fondo opaco para que se lean.
     c[ImGuiCol_PopupBg]        = pal.isDark ? ImVec4(0.12f,0.12f,0.15f,0.98f)
                                             : ImVec4(0.98f,0.98f,1.00f,0.98f);
@@ -293,13 +321,23 @@ void UiApp::barraNavegacion(int width, int height) {
     const char* etiquetas[3] = { "Tareas", "Historial", "Configuracion" };
     auto botonNav = [&](int idx) {
         bool activo = (vista_ == idx);
+        // Igual que el original: inactivo = transparente (solo resalta al pasar
+        // el mouse), activo = relleno solido con el color de acento.
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
         if (activo) {
             ImGui::PushStyleColor(ImGuiCol_Button, v4(pal.accent));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(pal.accent));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, v4(pal.accent));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,1,1,1));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0,0,0,0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(pal.hoverBg));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, v4(pal.hoverBg));
         }
         ImVec2 sz = horizontal ? ImVec2(140, 40) : ImVec2(w - 36, 40);
         if (ImGui::Button(etiquetas[idx], sz)) vista_ = idx;
-        if (activo) ImGui::PopStyleColor(2);
+        ImGui::PopStyleColor(activo ? 4 : 3);
+        ImGui::PopStyleVar();
         if (horizontal) ImGui::SameLine();
     };
     for (int i = 0; i < 3; ++i) botonNav(i);
@@ -512,7 +550,7 @@ void UiApp::vistaConfig() {
         ImGui::Spacing();
         cuerpo();
         ImGui::EndChild();
-        ImGui::Spacing();
+        ImGui::Dummy(ImVec2(0, 10)); // mas separacion visual entre paneles
     };
 
     ImGui::SetWindowFontScale(1.3f);
@@ -558,8 +596,10 @@ void UiApp::vistaConfig() {
     grupo("Canales de aviso", [&]{
         ImGui::Checkbox("Notificacion de Windows (se repite cada 5 min hasta completar)", &config_.notificaciones.ventana);
         ImGui::Checkbox("Aviso por correo electronico", &config_.notificaciones.correo);
-        ImGui::InputInt("Correccion horaria (minutos)", &config_.correccionHorariaMin);
+        ImGui::InputInt("Correccion horaria (minutos)", &config_.correccionHorariaMin, 0, 0);
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 500.0f);
         ImGui::TextDisabled("Si los avisos llegan tarde/temprano por zona horaria, ajusta aqui (ej. 60 o -60).");
+        ImGui::PopTextWrapPos();
     });
 
     grupo("Avisos por correo", [&]{
@@ -569,7 +609,7 @@ void UiApp::vistaConfig() {
         if (ImGui::InputText("Contrasena de aplicacion", pass, sizeof(pass), ImGuiInputTextFlags_Password)) config_.email.appPassword = pass;
         char host[128]; strncpy_s(host, config_.email.smtpHost.c_str(), _TRUNCATE);
         if (ImGui::InputText("Servidor SMTP", host, sizeof(host))) config_.email.smtpHost = host;
-        ImGui::InputInt("Puerto SMTP", &config_.email.smtpPort);
+        ImGui::InputInt("Puerto SMTP", &config_.email.smtpPort, 0, 0);
         if (ImGui::Button("Probar correo")) {
             guardarConfig(true);
             setEstado("Enviando correo de prueba...");
@@ -592,7 +632,9 @@ void UiApp::vistaConfig() {
     });
 
     grupo("Sincronizacion con Google Calendar (opcional)", [&]{
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 500.0f);
         ImGui::TextDisabled("Este es el canal que llega a tu celular via Google Calendar.");
+        ImGui::PopTextWrapPos();
         char cid[256]; strncpy_s(cid, config_.googleCalendar.clientId.c_str(), _TRUNCATE);
         if (ImGui::InputText("Client ID", cid, sizeof(cid))) config_.googleCalendar.clientId = cid;
         char cs[256]; strncpy_s(cs, config_.googleCalendar.clientSecret.c_str(), _TRUNCATE);
@@ -662,7 +704,7 @@ void UiApp::modalTarea() {
     ImGui::PushItemWidth(-1);
     ImGui::InputTextWithHint("##titulo", "Que tienes que hacer?", inTitulo_, sizeof(inTitulo_));
     ImGui::TextUnformatted("Fecha limite (ultimo dia)");
-    selectorFecha("fecha", inFecha_, sizeof(inFecha_));
+    selectorFecha("fecha", inFecha_, sizeof(inFecha_), pal);
     ImGui::TextUnformatted("Notas");
     ImGui::InputTextMultiline("##notas", inNotas_, sizeof(inNotas_), ImVec2(-1, 70));
     ImGui::PopItemWidth();
