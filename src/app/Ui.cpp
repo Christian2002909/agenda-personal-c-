@@ -583,7 +583,11 @@ void UiApp::vistaConfig() {
         // Relleno interno generoso: que titulos/etiquetas/botones no queden
         // pegados a la esquina del panel (antes usaban el WindowPadding global 16,14).
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28, 22));
-        ImGui::BeginChild(titulo, ImVec2(540, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoScrollbar);
+        // AlwaysUseWindowPadding: sin esta bandera, un child SIN borde ignora el
+        // WindowPadding y el contenido queda pegado a la esquina del panel.
+        ImGui::BeginChild(titulo, ImVec2(540, 0),
+            ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding,
+            ImGuiWindowFlags_NoScrollbar);
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
         registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
         // Titulo del panel mas grande/prominente y con aire debajo, como en la
