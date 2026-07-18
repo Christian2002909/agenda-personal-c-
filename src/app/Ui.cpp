@@ -394,7 +394,7 @@ void UiApp::vistaAgenda() {
                           ImGuiWindowFlags_NoScrollbar);
         // Registrar el vidrio con la posicion/tamaño reales del child.
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
-        registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 18.0f));
+        registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
 
         dibujarTarjeta(activas[i], false, i);
 
@@ -522,7 +522,7 @@ void UiApp::vistaHistorial() {
         ImGui::PushID(1000 + i);
         ImGui::BeginChild("hcard", ImVec2(cardW, cardH), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
-        registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 18.0f));
+        registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
         dibujarTarjeta(hist[i], true, i);
         ImGui::EndChild();
         ImGui::PopID();
@@ -547,7 +547,7 @@ void UiApp::vistaConfig() {
     auto grupo = [&](const char* titulo, std::function<void()> cuerpo) {
         ImGui::BeginChild(titulo, ImVec2(540, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoScrollbar);
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
-        registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 18.0f));
+        registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
         ImGui::SetWindowFontScale(1.12f);
         ImGui::TextUnformatted(titulo);
         ImGui::SetWindowFontScale(1.0f);
