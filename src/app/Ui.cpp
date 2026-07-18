@@ -62,7 +62,13 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize, const Theme
     }
 
     ImGui::PushID(id);
-    std::string etiqueta = buf[0] ? buf : "aaaa-mm-dd";
+    // Mostrar en formato "dd/mm/aaaa" (visual) — internamente sigue "AAAA-MM-DD".
+    std::string etiqueta = "dd/mm/aaaa";
+    if (buf[0] && y > 0) {
+        char fmtBuf[16];
+        std::snprintf(fmtBuf, sizeof(fmtBuf), "%02d/%02d/%04d", d, m, y);
+        etiqueta = fmtBuf;
+    }
     // Mismo look que un campo de texto (fondo/borde de input), no un boton solido.
     ImGui::PushStyleColor(ImGuiCol_Button, v4(pal.inputBg));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(pal.hoverBg));
@@ -220,10 +226,10 @@ void UiApp::build(int width, int height, float timeSec) {
 
     // Estilo ImGui derivado de la paleta.
     ImGuiStyle& st = ImGui::GetStyle();
-    st.WindowRounding = 20; st.ChildRounding = 18; st.FrameRounding = 9;
+    st.WindowRounding = 20; st.ChildRounding = 18; st.FrameRounding = 10;
     st.PopupRounding = 16; st.GrabRounding = 8; st.WindowBorderSize = 0;
-    st.WindowPadding = ImVec2(18, 18); st.FramePadding = ImVec2(10, 6);
-    st.ItemSpacing = ImVec2(10, 10);
+    st.WindowPadding = ImVec2(16, 14); st.FramePadding = ImVec2(8, 5);
+    st.ItemSpacing = ImVec2(8, 6);
     // Borde visible en campos/botones/popups: sin esto se pierden contra el
     // fondo translucido del vidrio (todo se veia "plano").
     st.FrameBorderSize = 1.0f;
@@ -255,7 +261,7 @@ void UiApp::build(int width, int height, float timeSec) {
 
     // --- Zona de contenido ---
     const float pad = 16.0f;
-    const float SIDEBAR_W = 210.0f, SIDEBAR_H = 66.0f;
+    const float SIDEBAR_W = 160.0f, SIDEBAR_H = 66.0f;
     float cx=pad, cy=pad, cw=(float)width-2*pad, ch=(float)height-2*pad;
     const std::string& pos = config_.posicionPanel;
     if (pos == "izquierda") { cx = pad*2 + SIDEBAR_W; cw = (float)width - cx - pad; }
@@ -296,7 +302,7 @@ void UiApp::endFrame() {
 void UiApp::barraNavegacion(int width, int height) {
     ThemePalette pal = resolverPaleta(config_);
     const float pad = 16.0f;
-    const float SIDEBAR_W = 210.0f, SIDEBAR_H = 66.0f;
+    const float SIDEBAR_W = 160.0f, SIDEBAR_H = 66.0f;
     const std::string& pos = config_.posicionPanel;
 
     float x=pad, y=pad, w=SIDEBAR_W, h=(float)height-2*pad;
@@ -314,7 +320,9 @@ void UiApp::barraNavegacion(int width, int height) {
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoBackground);
 
     ImGui::PushStyleColor(ImGuiCol_Text, v4(pal.fg));
+    ImGui::SetWindowFontScale(1.1f);
     ImGui::TextUnformatted("Agenda Personal");
+    ImGui::SetWindowFontScale(1.0f);
     ImGui::PopStyleColor();
     ImGui::Spacing();
 
@@ -331,10 +339,10 @@ void UiApp::barraNavegacion(int width, int height) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,1,1,1));
         } else {
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0,0,0,0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(pal.hoverBg));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0,0,0,0.04f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, v4(pal.hoverBg));
         }
-        ImVec2 sz = horizontal ? ImVec2(140, 40) : ImVec2(w - 36, 40);
+        ImVec2 sz = horizontal ? ImVec2(120, 32) : ImVec2(w - 28, 32);
         if (ImGui::Button(etiquetas[idx], sz)) vista_ = idx;
         ImGui::PopStyleColor(activo ? 4 : 3);
         ImGui::PopStyleVar();
@@ -352,10 +360,13 @@ void UiApp::vistaAgenda() {
     ImGui::SetWindowFontScale(1.3f);
     ImGui::TextUnformatted("Mis tareas");
     ImGui::SetWindowFontScale(1.0f);
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 150);
+    float btnNW = ImGui::CalcTextSize("+ Nueva tarea").x + 30.0f;
+    ImGui::SameLine(ImGui::GetContentRegionAvail().x - btnNW);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 16.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
     ImGui::PushStyleColor(ImGuiCol_Button, v4(pal.accent));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,1,1,1));
-    if (ImGui::Button("+ Nueva tarea", ImVec2(150, 0))) {
+    if (ImGui::Button("+ Nueva tarea")) {
         modalAbierto_ = true; modalEsNueva_ = true;
         modalTarea_ = Tarea{};
         strncpy_s(inTitulo_, "", _TRUNCATE);
@@ -365,6 +376,7 @@ void UiApp::vistaAgenda() {
         inNuevoDia_ = 3; strncpy_s(inNuevoHorario_, "09:00", _TRUNCATE);
     }
     ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(2);
     ImGui::TextDisabled("Arrastra las tarjetas para reordenarlas.");
     ImGui::Spacing();
 
@@ -537,7 +549,30 @@ static bool comboStr(const char* label, std::string& valor, const char* const* i
     ImGui::TextUnformatted(label);
     std::string idLabel = std::string("##") + label;
     ImGui::PushItemWidth(-1);
-    if (ImGui::Combo(idLabel.c_str(), &idx, items, n)) { valor = valores[idx]; changed = true; }
+    // BeginCombo sin flecha default para dibujar un chevron mas pequeno.
+    if (ImGui::BeginCombo(idLabel.c_str(), items[idx], ImGuiComboFlags_NoArrowButton)) {
+        for (int i = 0; i < n; ++i) {
+            bool sel = (i == idx);
+            if (ImGui::Selectable(items[i], sel)) { valor = valores[i]; changed = true; }
+            if (sel) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    // Chevron pequeno (triangulo sutil) a la derecha del combo.
+    {
+        ImVec2 mn = ImGui::GetItemRectMin();
+        ImVec2 mx = ImGui::GetItemRectMax();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        float midY = (mn.y + mx.y) * 0.5f;
+        float cx = mx.x - 14.0f;
+        float sz = 3.5f;
+        ImU32 col = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        dl->AddTriangleFilled(
+            ImVec2(cx - sz, midY - sz * 0.5f),
+            ImVec2(cx + sz, midY - sz * 0.5f),
+            ImVec2(cx, midY + sz * 0.6f),
+            col);
+    }
     ImGui::PopItemWidth();
     return changed;
 }
@@ -750,9 +785,9 @@ void UiApp::modalTarea() {
         if (i < (int)diasTemp_.size()-1) ImGui::SameLine();
     }
     ImGui::SetNextItemWidth(120);
-    ImGui::InputInt("##nuevodia", &inNuevoDia_);
+    ImGui::InputInt("##nuevodia", &inNuevoDia_, 0, 0);
     ImGui::SameLine();
-    if (ImGui::Button("+ Agregar dia")) {
+    if (ImGui::Button("+ Agregar")) {
         if (inNuevoDia_ >= 0 && std::find(diasTemp_.begin(), diasTemp_.end(), inNuevoDia_) == diasTemp_.end())
             diasTemp_.push_back(inNuevoDia_);
     }
@@ -769,14 +804,31 @@ void UiApp::modalTarea() {
     ImGui::SetNextItemWidth(120);
     ImGui::InputTextWithHint("##nuevohora", "09:00", inNuevoHorario_, sizeof(inNuevoHorario_));
     ImGui::SameLine();
-    if (ImGui::Button("+ Agregar horario")) {
+    if (ImGui::Button("+ Agregar")) {
         std::string h = inNuevoHorario_;
         if (h.size() == 5 && h[2]==':' && std::find(horariosTemp_.begin(), horariosTemp_.end(), h) == horariosTemp_.end())
             horariosTemp_.push_back(h);
     }
 
-    ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing();
+    ImGui::Spacing(); ImGui::Spacing();
+    // Alinear botones a la derecha (como en la version Electron).
+    {
+        const ImGuiStyle& sty = ImGui::GetStyle();
+        float wCancel  = ImGui::CalcTextSize("Cancelar").x + sty.FramePadding.x * 2;
+        float wGuardar = ImGui::CalcTextSize("Guardar").x  + sty.FramePadding.x * 2;
+        float wElim    = modalEsNueva_ ? 0.0f : (ImGui::CalcTextSize("Eliminar").x + sty.FramePadding.x * 2);
+        int   nGaps    = modalEsNueva_ ? 1 : 2;
+        float totalW   = wCancel + wGuardar + wElim + sty.ItemSpacing.x * nGaps;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - totalW);
+    }
+    // Cancelar: ghost button (transparente, sin borde).
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0,0,0,0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(pal.hoverBg));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, v4(pal.hoverBg));
     if (ImGui::Button("Cancelar")) modalAbierto_ = false;
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar();
     ImGui::SameLine();
     if (!modalEsNueva_) {
         ImGui::PushStyleColor(ImGuiCol_Button, v4(pal.peligro));
