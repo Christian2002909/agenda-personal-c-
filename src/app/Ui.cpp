@@ -580,6 +580,9 @@ static bool comboStr(const char* label, std::string& valor, const char* const* i
 void UiApp::vistaConfig() {
     ThemePalette pal = resolverPaleta(config_);
     auto grupo = [&](const char* titulo, std::function<void()> cuerpo) {
+        // Relleno interno generoso: que titulos/etiquetas/botones no queden
+        // pegados a la esquina del panel (antes usaban el WindowPadding global 16,14).
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(28, 22));
         ImGui::BeginChild(titulo, ImVec2(540, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoScrollbar);
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
         registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
@@ -589,6 +592,7 @@ void UiApp::vistaConfig() {
         ImGui::Spacing();
         cuerpo();
         ImGui::EndChild();
+        ImGui::PopStyleVar();
         ImGui::Dummy(ImVec2(0, 14)); // mas separacion visual entre paneles
     };
 
