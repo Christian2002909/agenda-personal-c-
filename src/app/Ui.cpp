@@ -586,20 +586,23 @@ void UiApp::vistaConfig() {
         ImGui::BeginChild(titulo, ImVec2(540, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoScrollbar);
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
         registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
-        ImGui::SetWindowFontScale(1.12f);
+        // Titulo del panel mas grande/prominente y con aire debajo, como en la
+        // version original (Electron).
+        ImGui::SetWindowFontScale(1.30f);
         ImGui::TextUnformatted(titulo);
         ImGui::SetWindowFontScale(1.0f);
-        ImGui::Spacing();
+        ImGui::Dummy(ImVec2(0, 8)); // aire entre el titulo del panel y el primer campo
         cuerpo();
         ImGui::EndChild();
         ImGui::PopStyleVar();
         ImGui::Dummy(ImVec2(0, 14)); // mas separacion visual entre paneles
     };
 
-    ImGui::SetWindowFontScale(1.3f);
+    ImGui::Dummy(ImVec2(0, 4)); // pequeno margen superior para el titulo de la pagina
+    ImGui::SetWindowFontScale(1.45f);
     ImGui::TextUnformatted("Configuracion");
     ImGui::SetWindowFontScale(1.0f);
-    ImGui::Spacing();
+    ImGui::Dummy(ImVec2(0, 6));
 
     ImGui::PushItemWidth(300);
 
