@@ -158,12 +158,35 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize, const Theme
         for (int dia = 1; dia <= totalDias; ++dia) {
             bool esElegido = (dia == d && navMes == m && navAnio == y);
             char lbl[8]; std::snprintf(lbl, sizeof(lbl), "%d", dia);
-            if (esElegido) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-            if (ImGui::Button(lbl, ImVec2(kCell, 30))) {
+            ImGui::PushID(dia);
+
+            // Boton invisible solo para el clic/hover; el circulo de seleccion y
+            // el numero se dibujan a mano, centrados por calculo exacto en la
+            // celda (evita cualquier desalineacion del centrado automatico de
+            // ImGui::Button con el estilo/redondeo global del resto de la app).
+            bool clic = ImGui::InvisibleButton("dia", ImVec2(kCell, 30));
+            ImVec2 cMin = ImGui::GetItemRectMin();
+            ImVec2 cMax = ImGui::GetItemRectMax();
+            ImVec2 centro((cMin.x + cMax.x) * 0.5f, (cMin.y + cMax.y) * 0.5f);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+
+            if (esElegido) {
+                ImU32 colSel = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                dl->AddCircleFilled(centro, kCell * 0.42f, colSel, 24);
+            } else if (ImGui::IsItemHovered()) {
+                ImU32 colHov = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+                dl->AddCircleFilled(centro, kCell * 0.42f, colHov, 24);
+            }
+            ImVec2 tsz = ImGui::CalcTextSize(lbl);
+            ImU32 colTxt = ImGui::ColorConvertFloat4ToU32(
+                esElegido ? ImVec4(1,1,1,1) : ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            dl->AddText(ImVec2(centro.x - tsz.x * 0.5f, centro.y - tsz.y * 0.5f), colTxt, lbl);
+
+            if (clic) {
                 std::snprintf(buf, bufSize, "%04d-%02d-%02d", navAnio, navMes, dia);
                 ImGui::CloseCurrentPopup();
             }
-            if (esElegido) ImGui::PopStyleColor();
+            ImGui::PopID();
             if ((primerDia + dia) % 7 != 0) ImGui::SameLine(0, 0);
         }
         ImGui::EndPopup();
