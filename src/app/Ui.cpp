@@ -221,6 +221,66 @@ static void badge(const char* texto, const Col& color) {
     ImGui::Dummy(ImVec2(ts.x + pad.x*2, ts.y + pad.y*2));
 }
 
+// Checkbox de tamano fijo (no depende del tamano de fuente cargado, que es 21px
+// y hacia que ImGui::Checkbox por defecto dibujara una casilla enorme —
+// ImGui calcula el lado de la casilla como FontSize + FramePadding.y*2). Se
+// dibuja a mano, igual que badge()/dia del calendario, para desacoplar el
+// tamano de la casilla del tamano del texto de la etiqueta.
+static bool casillaCompacta(const char* label, bool* v, const ThemePalette& pal) {
+    ImGui::PushID(label);
+    const float box = 18.0f;
+    float y0 = ImGui::GetCursorPosY();
+    ImVec2 p0 = ImGui::GetCursorScreenPos();
+    bool clic = ImGui::InvisibleButton("chk", ImVec2(box, box));
+    bool hover = ImGui::IsItemHovered();
+    if (clic) *v = !*v;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 p1(p0.x + box, p0.y + box);
+    if (*v) {
+        ImU32 colBg = ImGui::ColorConvertFloat4ToU32(v4(pal.accent));
+        dl->AddRectFilled(p0, p1, colBg, 5.0f);
+        ImU32 colChk = IM_COL32(255, 255, 255, 255);
+        ImVec2 a(p0.x + box * 0.22f, p0.y + box * 0.52f);
+        ImVec2 b(p0.x + box * 0.42f, p0.y + box * 0.74f);
+        ImVec2 c(p0.x + box * 0.80f, p0.y + box * 0.28f);
+        dl->AddLine(a, b, colChk, 2.2f);
+        dl->AddLine(b, c, colChk, 2.2f);
+    } else {
+        ImU32 colBg = ImGui::ColorConvertFloat4ToU32(v4(pal.inputBg));
+        dl->AddRectFilled(p0, p1, colBg, 5.0f);
+        ImU32 colBorde = ImGui::ColorConvertFloat4ToU32(v4(pal.borde));
+        dl->AddRect(p0, p1, colBorde, 5.0f, 0, 1.3f);
+    }
+    if (hover) {
+        ImU32 colHov = ImGui::ColorConvertFloat4ToU32(v4(pal.accent));
+        dl->AddRect(p0, p1, colHov, 5.0f, 0, 1.5f);
+    }
+
+    ImGui::SameLine();
+    float th = ImGui::GetTextLineHeight();
+    ImGui::SetCursorPosY(y0 + (box - th) * 0.5f);
+    ImGui::TextUnformatted(label);
+    ImGui::PopID();
+    return clic;
+}
+
+// Chip/etiqueta neutra (fondo tenue, sin color de acento) para horarios y
+// avisos, dibujada como una pildora igual que badge() pero con la paleta
+// "de input" en vez de un color de estado.
+static void chip(const char* texto, const ThemePalette& pal) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 pad(9, 3);
+    ImVec2 ts = ImGui::CalcTextSize(texto);
+    ImVec2 p0 = ImGui::GetCursorScreenPos();
+    ImVec2 p1(p0.x + ts.x + pad.x * 2, p0.y + ts.y + pad.y * 2);
+    ImU32 bg = ImGui::ColorConvertFloat4ToU32(v4(pal.inputBg));
+    dl->AddRectFilled(p0, p1, bg, (p1.y - p0.y) * 0.5f);
+    ImU32 colTxt = ImGui::ColorConvertFloat4ToU32(v4(pal.fgDim));
+    dl->AddText(ImVec2(p0.x + pad.x, p0.y + pad.y), colTxt, texto);
+    ImGui::Dummy(ImVec2(ts.x + pad.x * 2, ts.y + pad.y * 2));
+}
+
 void UiApp::init(Store* store, ID3D11Device* dev, ID3D11DeviceContext* ctx, HWND hwnd) {
     store_ = store; dev_ = dev; ctx_ = ctx; hwnd_ = hwnd;
     config_ = store_->getConfig();
@@ -449,7 +509,6 @@ void UiApp::vistaAgenda() {
     int cols = std::max(1, (int)(avail / 300.0f));
     float gap = 14.0f;
     float cardW = (avail - gap * (cols - 1)) / cols;
-    const float cardH = 226.0f; // +26 vs antes: espacio para el padding interno (24,20) de la tarjeta
 
     for (int i = 0; i < (int)activas.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
@@ -457,9 +516,11 @@ void UiApp::vistaAgenda() {
         // Relleno interno generoso (igual que los paneles de Configuracion): el
         // WindowPadding global (16,14) se ve pegado a la esquina en una tarjeta;
         // AlwaysUseWindowPadding es necesario ademas para que un child SIN borde
-        // respete el WindowPadding en vez de ignorarlo.
+        // respete el WindowPadding en vez de ignorarlo. Alto automatico (se
+        // ajusta al contenido, como el programa original) en vez de fijo.
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 20));
-        ImGui::BeginChild("card", ImVec2(cardW, cardH), ImGuiChildFlags_AlwaysUseWindowPadding,
+        ImGui::BeginChild("card", ImVec2(cardW, 0),
+                          ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY,
                           ImGuiWindowFlags_NoScrollbar);
         // Registrar el vidrio con la posicion/tamaño reales del child.
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
@@ -501,8 +562,10 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
     ThemePalette pal = resolverPaleta(config_);
     ImGui::PushStyleColor(ImGuiCol_Text, v4(pal.fg));
 
-    // Cabecera: titulo + badge.
+    // Cabecera: titulo (con mas peso visual que el resto del texto) + badge.
+    ImGui::SetWindowFontScale(1.15f);
     ImGui::TextWrapped("%s", t.titulo.c_str());
+    ImGui::SetWindowFontScale(1.0f);
     {
         // Se decide primero el texto/color del badge, y se calcula su ancho
         // REAL (igual formula que dentro de badge()) para posicionarlo. Antes
@@ -523,38 +586,57 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - badgeW);
         badge(lbl, col);
     }
+    ImGui::Dummy(ImVec2(0, 3));
 
     ImGui::PushStyleColor(ImGuiCol_Text, v4(pal.fgDim));
     ImGui::Text("Ultimo dia: %s", t.fechaLimite.c_str());
     if (!t.notas.empty()) ImGui::TextWrapped("%s", t.notas.c_str());
     ImGui::PopStyleColor();
 
-    // Chips (dias antes / horarios).
-    std::string chips;
-    for (int d : t.avisosPrevios) chips += std::to_string(d) + "d antes   ";
-    for (auto& h : t.horarios) chips += h + "   ";
-    if (!chips.empty()) ImGui::TextDisabled("%s", chips.c_str());
+    // Chips (dias antes / horarios), como pildoras individuales (igual que el
+    // programa original), no como una linea larga de texto plano.
+    {
+        bool primero = true;
+        for (int d : t.avisosPrevios) {
+            if (!primero) ImGui::SameLine(0, 6);
+            char b[24]; std::snprintf(b, sizeof(b), "%dd antes", d);
+            chip(b, pal);
+            primero = false;
+        }
+        for (auto& h : t.horarios) {
+            if (!primero) ImGui::SameLine(0, 6);
+            chip(h.c_str(), pal);
+            primero = false;
+        }
+    }
 
-    // Acciones abajo (deja el mismo margen inferior que el WindowPadding de la tarjeta).
-    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 72);
+    // Acciones justo debajo del contenido (la tarjeta se ajusta a su alto real
+    // via ImGuiChildFlags_AutoResizeY), pegadas a la izquierda como en el
+    // programa original — no centradas ni separadas por un hueco.
+    ImGui::Dummy(ImVec2(0, 10));
+
+    // Botones tipo "pildora" (fondo + relleno propio), no solo texto plano.
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(13, 6));
     if (historial) {
-        if (ImGui::SmallButton("Reabrir")) {
+        if (ImGui::Button("Reabrir")) {
             Tarea nt = t; nt.completada = false; nt.eliminada = false;
             nt.orden = 0;
             guardarTareaConSync(nt);
         }
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Button, v4(pal.peligro));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(pal.peligro));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,1,1,1));
-        if (ImGui::SmallButton("Eliminar definitivamente")) eliminarDefinitiva(t.id);
-        ImGui::PopStyleColor(2);
+        if (ImGui::Button("Eliminar definitivamente")) eliminarDefinitiva(t.id);
+        ImGui::PopStyleColor(3);
     } else {
-        if (ImGui::SmallButton("Completar")) {
+        if (ImGui::Button("Completar")) {
             Tarea nt = t; nt.completada = true; nt.completadaEn = nowIso();
             guardarTareaConSync(nt);
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("Editar")) {
+        if (ImGui::Button("Editar")) {
             modalAbierto_ = true; modalEsNueva_ = false; modalTarea_ = t;
             strncpy_s(inTitulo_, t.titulo.c_str(), _TRUNCATE);
             strncpy_s(inFecha_, t.fechaLimite.c_str(), _TRUNCATE);
@@ -564,13 +646,15 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
         }
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Button, v4(pal.peligro));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(pal.peligro));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,1,1,1));
-        if (ImGui::SmallButton("Eliminar")) {
+        if (ImGui::Button("Eliminar")) {
             Tarea nt = t; nt.eliminada = true; nt.eliminadaEn = nowIso();
             guardarTareaConSync(nt);
         }
-        ImGui::PopStyleColor(2);
+        ImGui::PopStyleColor(3);
     }
+    ImGui::PopStyleVar(2);
     ImGui::PopStyleColor();
 }
 
@@ -596,13 +680,14 @@ void UiApp::vistaHistorial() {
     int cols = std::max(1, (int)(avail / 300.0f));
     float gap = 14.0f;
     float cardW = (avail - gap*(cols-1)) / cols;
-    const float cardH = 204.0f; // +26 vs antes: espacio para el padding interno (24,20) de la tarjeta
     for (int i = 0; i < (int)hist.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
         ImGui::PushID(1000 + i);
-        // Mismo relleno generoso que las tarjetas de "Mis tareas".
+        // Mismo relleno generoso que las tarjetas de "Mis tareas". Alto automatico.
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 20));
-        ImGui::BeginChild("hcard", ImVec2(cardW, cardH), ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
+        ImGui::BeginChild("hcard", ImVec2(cardW, 0),
+                          ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY,
+                          ImGuiWindowFlags_NoScrollbar);
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
         registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
         dibujarTarjeta(hist[i], true, i);
@@ -715,8 +800,8 @@ void UiApp::vistaConfig() {
     });
 
     grupo("Canales de aviso", [&]{
-        ImGui::Checkbox("Notificacion de Windows (se repite cada 5 min hasta completar)", &config_.notificaciones.ventana);
-        ImGui::Checkbox("Aviso por correo electronico", &config_.notificaciones.correo);
+        casillaCompacta("Notificacion de Windows (se repite cada 5 min hasta completar)", &config_.notificaciones.ventana, pal);
+        casillaCompacta("Aviso por correo electronico", &config_.notificaciones.correo, pal);
         ImGui::TextUnformatted("Correccion horaria (minutos)");
         ImGui::PushItemWidth(-1);
         ImGui::InputInt("##correccionHoraria", &config_.correccionHorariaMin, 0, 0);
@@ -762,7 +847,7 @@ void UiApp::vistaConfig() {
     });
 
     grupo("Inicio", [&]{
-        if (ImGui::Checkbox("Iniciar Agenda Personal con Windows", &config_.iniciarConWindows)) {
+        if (casillaCompacta("Iniciar Agenda Personal con Windows", &config_.iniciarConWindows, pal)) {
             if (onAutostart) onAutostart(config_.iniciarConWindows);
         }
     });
@@ -798,7 +883,7 @@ void UiApp::vistaConfig() {
         }
         ImGui::SameLine();
         ImGui::TextUnformatted(config_.googleCalendar.tokens.valido ? "Conectado" : "No conectado");
-        ImGui::Checkbox("Activar sincronizacion con Google Calendar", &config_.googleCalendar.activo);
+        casillaCompacta("Activar sincronizacion con Google Calendar", &config_.googleCalendar.activo, pal);
     });
 
     grupo("Sincronizacion con Apple Reminders / iCloud (opcional)", [&]{
@@ -812,7 +897,7 @@ void UiApp::vistaConfig() {
         ImGui::PushItemWidth(-1);
         if (ImGui::InputText("##passIcloud", ap, sizeof(ap), ImGuiInputTextFlags_Password)) config_.icloudReminders.appPassword = ap;
         ImGui::PopItemWidth();
-        ImGui::Checkbox("Activar sincronizacion con iCloud", &config_.icloudReminders.activo);
+        casillaCompacta("Activar sincronizacion con iCloud", &config_.icloudReminders.activo, pal);
     });
 
     ImGui::PopItemWidth();
