@@ -103,6 +103,17 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize, const Theme
     // el SameLine(GetWindowWidth()-34) retroalimentaba el ancho de la ventana.
     ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(260, 520));
     if (ImGui::BeginPopup("calPopup")) {
+        // Fondo solido del calendario: evita que el contenido del modal de atras
+        // se transparente a traves del popup.
+        {
+            ImDrawList* pdl = ImGui::GetWindowDrawList();
+            ImVec2 a = ImGui::GetWindowPos();
+            ImVec2 sz = ImGui::GetWindowSize();
+            ImVec2 b = ImVec2(a.x + sz.x, a.y + sz.y);
+            ImVec4 pf = pal.isDark ? ImVec4(0.14f,0.14f,0.18f,1.0f)
+                                   : ImVec4(0.98f,0.98f,1.00f,1.0f);
+            pdl->AddRectFilled(a, b, ImGui::ColorConvertFloat4ToU32(pf), ImGui::GetStyle().PopupRounding);
+        }
         ImGuiStorage* st = ImGui::GetStateStorage();
         int navAnio = st->GetInt(ImGui::GetID("navAnio"), y);
         int navMes  = st->GetInt(ImGui::GetID("navMes"), m);
@@ -252,8 +263,8 @@ void UiApp::build(int width, int height, float timeSec) {
     c[ImGuiCol_BorderShadow]   = ImVec4(0,0,0,0);
     c[ImGuiCol_TextDisabled]   = v4(pal.fgDim);
     // Los desplegables (combos) son popups reales: fondo opaco para que se lean.
-    c[ImGuiCol_PopupBg]        = pal.isDark ? ImVec4(0.12f,0.12f,0.15f,0.98f)
-                                            : ImVec4(0.98f,0.98f,1.00f,0.98f);
+    c[ImGuiCol_PopupBg]        = pal.isDark ? ImVec4(0.12f,0.12f,0.15f,1.00f)
+                                            : ImVec4(0.98f,0.98f,1.00f,1.00f);
     c[ImGuiCol_FrameBg]        = v4(pal.inputBg);
     c[ImGuiCol_FrameBgHovered] = v4(pal.hoverBg);
     c[ImGuiCol_FrameBgActive]  = v4(pal.inputBg);
