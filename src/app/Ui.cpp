@@ -449,12 +449,17 @@ void UiApp::vistaAgenda() {
     int cols = std::max(1, (int)(avail / 300.0f));
     float gap = 14.0f;
     float cardW = (avail - gap * (cols - 1)) / cols;
-    const float cardH = 200.0f; // +28 vs antes: la fuente 21px necesita mas alto para no chocar con los botones
+    const float cardH = 226.0f; // +26 vs antes: espacio para el padding interno (24,20) de la tarjeta
 
     for (int i = 0; i < (int)activas.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
         ImGui::PushID(i);
-        ImGui::BeginChild("card", ImVec2(cardW, cardH), ImGuiChildFlags_None,
+        // Relleno interno generoso (igual que los paneles de Configuracion): el
+        // WindowPadding global (16,14) se ve pegado a la esquina en una tarjeta;
+        // AlwaysUseWindowPadding es necesario ademas para que un child SIN borde
+        // respete el WindowPadding en vez de ignorarlo.
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 20));
+        ImGui::BeginChild("card", ImVec2(cardW, cardH), ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar);
         // Registrar el vidrio con la posicion/tamaño reales del child.
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
@@ -487,6 +492,7 @@ void UiApp::vistaAgenda() {
             ImGui::EndDragDropTarget();
         }
         ImGui::EndChild();
+        ImGui::PopStyleVar();
         ImGui::PopID();
     }
 }
@@ -529,8 +535,8 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
     for (auto& h : t.horarios) chips += h + "   ";
     if (!chips.empty()) ImGui::TextDisabled("%s", chips.c_str());
 
-    // Acciones abajo.
-    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 46);
+    // Acciones abajo (deja el mismo margen inferior que el WindowPadding de la tarjeta).
+    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 72);
     if (historial) {
         if (ImGui::SmallButton("Reabrir")) {
             Tarea nt = t; nt.completada = false; nt.eliminada = false;
@@ -590,15 +596,18 @@ void UiApp::vistaHistorial() {
     int cols = std::max(1, (int)(avail / 300.0f));
     float gap = 14.0f;
     float cardW = (avail - gap*(cols-1)) / cols;
-    const float cardH = 178.0f; // +28 vs antes: la fuente 21px necesita mas alto para no chocar con los botones
+    const float cardH = 204.0f; // +26 vs antes: espacio para el padding interno (24,20) de la tarjeta
     for (int i = 0; i < (int)hist.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
         ImGui::PushID(1000 + i);
-        ImGui::BeginChild("hcard", ImVec2(cardW, cardH), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
+        // Mismo relleno generoso que las tarjetas de "Mis tareas".
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 20));
+        ImGui::BeginChild("hcard", ImVec2(cardW, cardH), ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
         registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
         dibujarTarjeta(hist[i], true, i);
         ImGui::EndChild();
+        ImGui::PopStyleVar();
         ImGui::PopID();
     }
 }
