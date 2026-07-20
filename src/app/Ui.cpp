@@ -99,52 +99,94 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize, const Theme
         ImGui::GetStateStorage()->SetInt(ImGui::GetID("navAnio"), y);
         ImGui::GetStateStorage()->SetInt(ImGui::GetID("navMes"), m);
     }
-    // Ancho fijo EN CADA FRAME: sin esto el popup se estiraba a lo ancho porque
-    // el SameLine(GetWindowWidth()-34) retroalimentaba el ancho de la ventana.
-    ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(260, 520));
+    // Ancho del popup ajustado EXACTO a las 7 columnas + relleno, para que la
+    // grilla quede centrada y sin hueco a un lado. (Ademas evita el estiramiento
+    // que causaba el SameLine(GetWindowWidth()-34).)
+    const float kCell  = 30.0f;                 // ancho/columna de cada dia
+    const float kGridW = 7.0f * kCell;          // ancho total de la grilla
+    const float kPad   = ImGui::GetStyle().WindowPadding.x;
+    const float kPopW  = kGridW + 2.0f * kPad;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(kPopW, 0), ImVec2(kPopW, 560));
     if (ImGui::BeginPopup("calPopup")) {
+        // Fondo solido del calendario: evita que el contenido del modal de atras
+        // se transparente a traves del popup.
+        {
+            ImDrawList* pdl = ImGui::GetWindowDrawList();
+            ImVec2 a = ImGui::GetWindowPos();
+            ImVec2 sz = ImGui::GetWindowSize();
+            ImVec4 pf = pal.isDark ? ImVec4(0.14f,0.14f,0.18f,1.0f)
+                                   : ImVec4(0.98f,0.98f,1.00f,1.0f);
+            pdl->AddRectFilled(a, ImVec2(a.x+sz.x, a.y+sz.y),
+                ImGui::ColorConvertFloat4ToU32(pf), ImGui::GetStyle().PopupRounding);
+        }
         ImGuiStorage* st = ImGui::GetStateStorage();
         int navAnio = st->GetInt(ImGui::GetID("navAnio"), y);
         int navMes  = st->GetInt(ImGui::GetID("navMes"), m);
 
+        const float x0 = ImGui::GetCursorPosX();  // borde izquierdo del contenido
+
+        // --- Barra de mes: "<" a la izq, mes centrado, ">" a la der ---
         if (ImGui::SmallButton("<")) { navMes--; if (navMes < 1) { navMes = 12; navAnio--; } }
-        ImGui::SameLine(0, 8);
-        ImGui::Text("%s %d", kMeses[navMes-1], navAnio);
-        ImGui::SameLine(ImGui::GetWindowWidth() - 34);
+        char tit[40]; std::snprintf(tit, sizeof(tit), "%s %d", kMeses[navMes-1], navAnio);
+        float tw = ImGui::CalcTextSize(tit).x;
+        ImGui::SameLine(); ImGui::SetCursorPosX(x0 + (kGridW - tw) * 0.5f);
+        ImGui::TextUnformatted(tit);
+        float bw = ImGui::CalcTextSize(">").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        ImGui::SameLine(); ImGui::SetCursorPosX(x0 + kGridW - bw);
         if (ImGui::SmallButton(">")) { navMes++; if (navMes > 12) { navMes = 1; navAnio++; } }
         st->SetInt(ImGui::GetID("navAnio"), navAnio);
         st->SetInt(ImGui::GetID("navMes"), navMes);
 
         ImGui::Spacing();
-        // Encabezado de dias alineado en columnas de 28px (igual que la grilla),
-        // con el nombre centrado en cada columna.
-        {
-            const float colW = 28.0f;
-            float x0 = ImGui::GetCursorPosX();
-            for (int i = 0; i < 7; ++i) {
-                float tw = ImGui::CalcTextSize(kDiasSemana[i]).x;
-                ImGui::SetCursorPosX(x0 + i * colW + (colW - tw) * 0.5f);
-                ImGui::TextDisabled("%s", kDiasSemana[i]);
-                if (i < 6) ImGui::SameLine();
-            }
+        // --- Encabezado de dias, centrado en cada columna de kCell ---
+        for (int i = 0; i < 7; ++i) {
+            float dw = ImGui::CalcTextSize(kDiasSemana[i]).x;
+            ImGui::SetCursorPosX(x0 + i * kCell + (kCell - dw) * 0.5f);
+            ImGui::TextDisabled("%s", kDiasSemana[i]);
+            if (i < 6) ImGui::SameLine();
         }
-        ImGui::NewLine();
+        // (Sin NewLine: la primera fila de dias cae sola en la linea siguiente;
+        //  un NewLine aqui metia una linea vacia extra y bajaba las fechas.)
 
+        // --- Grilla de dias (cada fila arranca en x0, celdas de kCell) ---
         int primerDia = diaSemanaPrimero(navAnio, navMes);
         int totalDias = diasEnMes(navAnio, navMes);
         for (int i = 0; i < primerDia; ++i) {
-            ImGui::Dummy(ImVec2(28, 24));
+            ImGui::Dummy(ImVec2(kCell, 30));
             ImGui::SameLine(0, 0);
         }
         for (int dia = 1; dia <= totalDias; ++dia) {
             bool esElegido = (dia == d && navMes == m && navAnio == y);
             char lbl[8]; std::snprintf(lbl, sizeof(lbl), "%d", dia);
-            if (esElegido) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-            if (ImGui::Button(lbl, ImVec2(28, 24))) {
+            ImGui::PushID(dia);
+
+            // Boton invisible solo para el clic/hover; el circulo de seleccion y
+            // el numero se dibujan a mano, centrados por calculo exacto en la
+            // celda (evita cualquier desalineacion del centrado automatico de
+            // ImGui::Button con el estilo/redondeo global del resto de la app).
+            bool clic = ImGui::InvisibleButton("dia", ImVec2(kCell, 30));
+            ImVec2 cMin = ImGui::GetItemRectMin();
+            ImVec2 cMax = ImGui::GetItemRectMax();
+            ImVec2 centro((cMin.x + cMax.x) * 0.5f, (cMin.y + cMax.y) * 0.5f);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+
+            if (esElegido) {
+                ImU32 colSel = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                dl->AddCircleFilled(centro, kCell * 0.42f, colSel, 24);
+            } else if (ImGui::IsItemHovered()) {
+                ImU32 colHov = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+                dl->AddCircleFilled(centro, kCell * 0.42f, colHov, 24);
+            }
+            ImVec2 tsz = ImGui::CalcTextSize(lbl);
+            ImU32 colTxt = ImGui::ColorConvertFloat4ToU32(
+                esElegido ? ImVec4(1,1,1,1) : ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            dl->AddText(ImVec2(centro.x - tsz.x * 0.5f, centro.y - tsz.y * 0.5f), colTxt, lbl);
+
+            if (clic) {
                 std::snprintf(buf, bufSize, "%04d-%02d-%02d", navAnio, navMes, dia);
                 ImGui::CloseCurrentPopup();
             }
-            if (esElegido) ImGui::PopStyleColor();
+            ImGui::PopID();
             if ((primerDia + dia) % 7 != 0) ImGui::SameLine(0, 0);
         }
         ImGui::EndPopup();
@@ -252,8 +294,8 @@ void UiApp::build(int width, int height, float timeSec) {
     c[ImGuiCol_BorderShadow]   = ImVec4(0,0,0,0);
     c[ImGuiCol_TextDisabled]   = v4(pal.fgDim);
     // Los desplegables (combos) son popups reales: fondo opaco para que se lean.
-    c[ImGuiCol_PopupBg]        = pal.isDark ? ImVec4(0.12f,0.12f,0.15f,0.98f)
-                                            : ImVec4(0.98f,0.98f,1.00f,0.98f);
+    c[ImGuiCol_PopupBg]        = pal.isDark ? ImVec4(0.12f,0.12f,0.15f,1.00f)
+                                            : ImVec4(0.98f,0.98f,1.00f,1.00f);
     c[ImGuiCol_FrameBg]        = v4(pal.inputBg);
     c[ImGuiCol_FrameBgHovered] = v4(pal.hoverBg);
     c[ImGuiCol_FrameBgActive]  = v4(pal.inputBg);
@@ -407,7 +449,7 @@ void UiApp::vistaAgenda() {
     int cols = std::max(1, (int)(avail / 300.0f));
     float gap = 14.0f;
     float cardW = (avail - gap * (cols - 1)) / cols;
-    const float cardH = 172.0f;
+    const float cardH = 200.0f; // +28 vs antes: la fuente 21px necesita mas alto para no chocar con los botones
 
     for (int i = 0; i < (int)activas.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
@@ -478,7 +520,7 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
     if (!chips.empty()) ImGui::TextDisabled("%s", chips.c_str());
 
     // Acciones abajo.
-    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 40);
+    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 46);
     if (historial) {
         if (ImGui::SmallButton("Reabrir")) {
             Tarea nt = t; nt.completada = false; nt.eliminada = false;
@@ -538,7 +580,7 @@ void UiApp::vistaHistorial() {
     int cols = std::max(1, (int)(avail / 300.0f));
     float gap = 14.0f;
     float cardW = (avail - gap*(cols-1)) / cols;
-    const float cardH = 150.0f;
+    const float cardH = 178.0f; // +28 vs antes: la fuente 21px necesita mas alto para no chocar con los botones
     for (int i = 0; i < (int)hist.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
         ImGui::PushID(1000 + i);
@@ -817,7 +859,7 @@ void UiApp::modalTarea() {
     ImGui::SetNextItemWidth(120);
     ImGui::InputInt("##nuevodia", &inNuevoDia_, 0, 0);
     ImGui::SameLine();
-    if (ImGui::Button("+ Agregar")) {
+    if (ImGui::Button("+ Agregar##dias")) {
         if (inNuevoDia_ >= 0 && std::find(diasTemp_.begin(), diasTemp_.end(), inNuevoDia_) == diasTemp_.end())
             diasTemp_.push_back(inNuevoDia_);
     }
@@ -834,7 +876,7 @@ void UiApp::modalTarea() {
     ImGui::SetNextItemWidth(120);
     ImGui::InputTextWithHint("##nuevohora", "09:00", inNuevoHorario_, sizeof(inNuevoHorario_));
     ImGui::SameLine();
-    if (ImGui::Button("+ Agregar")) {
+    if (ImGui::Button("+ Agregar##horarios")) {
         std::string h = inNuevoHorario_;
         if (h.size() == 5 && h[2]==':' && std::find(horariosTemp_.begin(), horariosTemp_.end(), h) == horariosTemp_.end())
             horariosTemp_.push_back(h);
