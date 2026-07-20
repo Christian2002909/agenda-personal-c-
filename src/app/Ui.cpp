@@ -449,7 +449,7 @@ void UiApp::vistaAgenda() {
     int cols = std::max(1, (int)(avail / 300.0f));
     float gap = 14.0f;
     float cardW = (avail - gap * (cols - 1)) / cols;
-    const float cardH = 172.0f;
+    const float cardH = 200.0f; // +28 vs antes: la fuente 21px necesita mas alto para no chocar con los botones
 
     for (int i = 0; i < (int)activas.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
@@ -520,7 +520,7 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
     if (!chips.empty()) ImGui::TextDisabled("%s", chips.c_str());
 
     // Acciones abajo.
-    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 40);
+    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 46);
     if (historial) {
         if (ImGui::SmallButton("Reabrir")) {
             Tarea nt = t; nt.completada = false; nt.eliminada = false;
@@ -580,7 +580,7 @@ void UiApp::vistaHistorial() {
     int cols = std::max(1, (int)(avail / 300.0f));
     float gap = 14.0f;
     float cardW = (avail - gap*(cols-1)) / cols;
-    const float cardH = 150.0f;
+    const float cardH = 178.0f; // +28 vs antes: la fuente 21px necesita mas alto para no chocar con los botones
     for (int i = 0; i < (int)hist.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
         ImGui::PushID(1000 + i);
@@ -859,7 +859,7 @@ void UiApp::modalTarea() {
     ImGui::SetNextItemWidth(120);
     ImGui::InputInt("##nuevodia", &inNuevoDia_, 0, 0);
     ImGui::SameLine();
-    if (ImGui::Button("+ Agregar")) {
+    if (ImGui::Button("+ Agregar##dias")) {
         if (inNuevoDia_ >= 0 && std::find(diasTemp_.begin(), diasTemp_.end(), inNuevoDia_) == diasTemp_.end())
             diasTemp_.push_back(inNuevoDia_);
     }
@@ -876,7 +876,7 @@ void UiApp::modalTarea() {
     ImGui::SetNextItemWidth(120);
     ImGui::InputTextWithHint("##nuevohora", "09:00", inNuevoHorario_, sizeof(inNuevoHorario_));
     ImGui::SameLine();
-    if (ImGui::Button("+ Agregar")) {
+    if (ImGui::Button("+ Agregar##horarios")) {
         std::string h = inNuevoHorario_;
         if (h.size() == 5 && h[2]==':' && std::find(horariosTemp_.begin(), horariosTemp_.end(), h) == horariosTemp_.end())
             horariosTemp_.push_back(h);
