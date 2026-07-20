@@ -454,7 +454,9 @@ void UiApp::vistaAgenda() {
     for (int i = 0; i < (int)activas.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
         ImGui::PushID(i);
-        ImGui::BeginChild("card", ImVec2(cardW, cardH), ImGuiChildFlags_None,
+        // AlwaysUseWindowPadding: sin esta bandera, un child SIN borde ignora el
+        // WindowPadding y el contenido queda pegado a la esquina de la tarjeta.
+        ImGui::BeginChild("card", ImVec2(cardW, cardH), ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar);
         // Registrar el vidrio con la posicion/tamaño reales del child.
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
@@ -594,7 +596,8 @@ void UiApp::vistaHistorial() {
     for (int i = 0; i < (int)hist.size(); ++i) {
         if (i % cols != 0) ImGui::SameLine(0, gap);
         ImGui::PushID(1000 + i);
-        ImGui::BeginChild("hcard", ImVec2(cardW, cardH), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
+        // AlwaysUseWindowPadding: mismo fix que en las tarjetas de "Mis tareas".
+        ImGui::BeginChild("hcard", ImVec2(cardW, cardH), ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
         registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
         dibujarTarjeta(hist[i], true, i);
