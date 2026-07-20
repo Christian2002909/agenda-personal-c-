@@ -173,7 +173,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int) {
     // Fuente Segoe UI (incluye acentos del español en el rango por defecto).
     // Solo se carga si el archivo existe; si no, ImGui usa su fuente por defecto.
     if (GetFileAttributesA("C:\\Windows\\Fonts\\segoeui.ttf") != INVALID_FILE_ATTRIBUTES)
-        io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 20.0f);
+        io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 22.0f);
 
     // UI.
     g_ui.init(&g_store, g_renderer.device(), g_renderer.context(), g_hwnd);
