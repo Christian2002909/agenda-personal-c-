@@ -94,12 +94,14 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize, const Theme
     }
 
     if (abrir) {
-        ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(240, 400));
         ImGui::OpenPopup("calPopup");
         // Guarda el mes que se muestra al abrir (mes actual de la fecha elegida).
         ImGui::GetStateStorage()->SetInt(ImGui::GetID("navAnio"), y);
         ImGui::GetStateStorage()->SetInt(ImGui::GetID("navMes"), m);
     }
+    // Ancho fijo EN CADA FRAME: sin esto el popup se estiraba a lo ancho porque
+    // el SameLine(GetWindowWidth()-34) retroalimentaba el ancho de la ventana.
+    ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(260, 520));
     if (ImGui::BeginPopup("calPopup")) {
         ImGuiStorage* st = ImGui::GetStateStorage();
         int navAnio = st->GetInt(ImGui::GetID("navAnio"), y);
@@ -114,9 +116,17 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize, const Theme
         st->SetInt(ImGui::GetID("navMes"), navMes);
 
         ImGui::Spacing();
-        for (int i = 0; i < 7; ++i) {
-            ImGui::TextDisabled("%s", kDiasSemana[i]);
-            ImGui::SameLine(0, 0); ImGui::Dummy(ImVec2(26, 1)); ImGui::SameLine(0, 0);
+        // Encabezado de dias alineado en columnas de 28px (igual que la grilla),
+        // con el nombre centrado en cada columna.
+        {
+            const float colW = 28.0f;
+            float x0 = ImGui::GetCursorPosX();
+            for (int i = 0; i < 7; ++i) {
+                float tw = ImGui::CalcTextSize(kDiasSemana[i]).x;
+                ImGui::SetCursorPosX(x0 + i * colW + (colW - tw) * 0.5f);
+                ImGui::TextDisabled("%s", kDiasSemana[i]);
+                if (i < 6) ImGui::SameLine();
+            }
         }
         ImGui::NewLine();
 
@@ -189,7 +199,7 @@ GlassPanel UiApp::panelBase(float x, float y, float w, float h, float radius) co
     ThemePalette pal = resolverPaleta(config_);
     GlassPanel p; p.x=x; p.y=y; p.w=w; p.h=h; p.radius=radius;
     p.tint = pal.glassBg; p.rim = pal.glassRim;
-    p.refractPx = 10.0f; p.shadowStrength = pal.isDark ? 0.28f : 0.18f;
+    p.refractPx = 14.0f; p.shadowStrength = pal.isDark ? 0.28f : 0.18f;
     return p;
 }
 
@@ -757,10 +767,6 @@ void UiApp::modalTarea() {
     ThemePalette pal = resolverPaleta(config_);
     ImGuiIO& io = ImGui::GetIO();
 
-    // Fondo oscuro detras del modal.
-    ImDrawList* bg = ImGui::GetBackgroundDrawList();
-    bg->AddRectFilled(ImVec2(0,0), io.DisplaySize, IM_COL32(0,0,0,90));
-
     float mw = std::min(520.0f, io.DisplaySize.x * 0.92f);
     float mh = std::min(560.0f, io.DisplaySize.y * 0.9f);
     float mx = (io.DisplaySize.x - mw) * 0.5f;
@@ -771,6 +777,19 @@ void UiApp::modalTarea() {
     ImGui::SetNextWindowSize(ImVec2(mw, mh), ImGuiCond_Always);
     ImGui::Begin("##modal", nullptr,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+
+    // Oscurece la vista de atras y da al modal un fondo solido, para que el
+    // texto de la pantalla de fondo no se transparente ni se superponga.
+    {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        dl->PushClipRectFullScreen();
+        dl->AddRectFilled(ImVec2(0,0), io.DisplaySize, IM_COL32(0,0,0,130));
+        dl->PopClipRect();
+        ImVec4 fill = pal.isDark ? ImVec4(0.13f,0.13f,0.17f,0.96f)
+                                 : ImVec4(0.97f,0.97f,1.00f,0.96f);
+        dl->AddRectFilled(ImVec2(mx, my), ImVec2(mx+mw, my+mh),
+                          ImGui::ColorConvertFloat4ToU32(fill), 24.0f);
+    }
 
     ImGui::SetWindowFontScale(1.2f);
     ImGui::TextUnformatted(modalEsNueva_ ? "Nueva tarea" : "Editar tarea");

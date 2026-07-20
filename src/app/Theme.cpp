@@ -89,11 +89,11 @@ ThemePalette resolverPaleta(const Config& cfg) {
     // Sobre foto o color solido: vidrio mas opaco y texto con sombra (themes.css).
     if (p.fondoConFoto) {
         if (!p.isDark) {
-            p.glassBg   = rgba(255,255,255,0.52f);
-            p.glassBorde= rgba(255,255,255,0.70f);
-            p.glassRim  = rgba(255,255,255,0.80f);
-            p.panelSolid= rgba(255,255,255,0.60f);
-            p.inputBg   = rgba(255,255,255,0.75f);
+            p.glassBg   = rgba(255,255,255,0.60f);
+            p.glassBorde= rgba(255,255,255,0.75f);
+            p.glassRim  = rgba(255,255,255,0.82f);
+            p.panelSolid= rgba(255,255,255,0.65f);
+            p.inputBg   = rgba(255,255,255,0.82f);
         } else {
             p.glassBg   = rgba(15,15,30,0.62f);
             p.glassBorde= rgba(255,255,255,0.18f);

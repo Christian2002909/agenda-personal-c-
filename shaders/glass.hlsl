@@ -96,13 +96,8 @@ float4 PSGlass(VSOut i) : SV_Target {
     float facing  = saturate(dot(n, normalize(float2(-1.0, -1.0))));
     col += rim.rgb * rim.a * rimMask * facing;
 
-    // Sheen: banda diagonal blanca que se desplaza con el tiempo (~9s de ciclo).
-    float2 luv = (p - panelMin) / max(panelSize, float2(1,1)); // 0..1 en el panel
-    float2 dir = normalize(float2(-0.9, 0.42));  // ~115 grados
-    float  s = dot(luv, dir);
-    float  phase = frac(time / 9.0) * 2.4 - 0.7; // recorre el panel de lado a lado
-    float  band = exp(-pow((s - phase) / 0.06, 2.0)) * 0.18;
-    col += band;
+    // (Sheen animado eliminado: se prefiere el vidrio "liquido" sin el brillo
+    // diagonal que se desplazaba y distraia.)
 
     return float4(col, cov);
 }

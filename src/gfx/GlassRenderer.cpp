@@ -143,7 +143,8 @@ void GlassRenderer::ensureSize(UINT w, UINT h) {
 
     downs_.clear();
     UINT lw = w, lh = h;
-    for (int i = 0; i < 3; ++i) {
+    // Mas niveles = desenfoque mas suave/difuso ("frosted" tipo Apple).
+    for (int i = 0; i < 5; ++i) {
         lw = std::max<UINT>(1, lw / 2);
         lh = std::max<UINT>(1, lh / 2);
         RenderTexture rt;
@@ -182,15 +183,19 @@ void GlassRenderer::buildBlur() {
         fullscreenPass(rtv, w, h, ps, src);
     };
 
-    // Downsample: bg -> down0 -> down1 -> down2
+    const int n = (int)downs_.size();
+    // Downsample: bg -> down0 -> down1 -> ... -> down[n-1]
     pase(downs_[0].rtv.Get(), downs_[0].w, downs_[0].h, psDown_.Get(), bgTex_.srv.Get(), bgTex_.w, bgTex_.h);
-    pase(downs_[1].rtv.Get(), downs_[1].w, downs_[1].h, psDown_.Get(), downs_[0].srv.Get(), downs_[0].w, downs_[0].h);
-    pase(downs_[2].rtv.Get(), downs_[2].w, downs_[2].h, psDown_.Get(), downs_[1].srv.Get(), downs_[1].w, downs_[1].h);
+    for (int i = 1; i < n; ++i)
+        pase(downs_[i].rtv.Get(), downs_[i].w, downs_[i].h, psDown_.Get(),
+             downs_[i-1].srv.Get(), downs_[i-1].w, downs_[i-1].h);
 
-    // Upsample: down2 -> down1 -> down0 -> blurTex (full res)
-    pase(downs_[1].rtv.Get(), downs_[1].w, downs_[1].h, psUp_.Get(), downs_[2].srv.Get(), downs_[2].w, downs_[2].h);
-    pase(downs_[0].rtv.Get(), downs_[0].w, downs_[0].h, psUp_.Get(), downs_[1].srv.Get(), downs_[1].w, downs_[1].h);
-    pase(blurTex_.rtv.Get(),  blurTex_.w,  blurTex_.h,  psUp_.Get(), downs_[0].srv.Get(), downs_[0].w, downs_[0].h);
+    // Upsample: down[n-1] -> ... -> down0 -> blurTex (full res)
+    for (int i = n - 2; i >= 0; --i)
+        pase(downs_[i].rtv.Get(), downs_[i].w, downs_[i].h, psUp_.Get(),
+             downs_[i+1].srv.Get(), downs_[i+1].w, downs_[i+1].h);
+    pase(blurTex_.rtv.Get(), blurTex_.w, blurTex_.h, psUp_.Get(),
+         downs_[0].srv.Get(), downs_[0].w, downs_[0].h);
 }
 
 void GlassRenderer::renderBackground(ID3D11RenderTargetView* backRTV, UINT w, UINT h,
