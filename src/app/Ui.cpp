@@ -145,20 +145,21 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize, const Theme
             ImGui::TextDisabled("%s", kDiasSemana[i]);
             if (i < 6) ImGui::SameLine();
         }
-        ImGui::NewLine();
+        // (Sin NewLine: la primera fila de dias cae sola en la linea siguiente;
+        //  un NewLine aqui metia una linea vacia extra y bajaba las fechas.)
 
         // --- Grilla de dias (cada fila arranca en x0, celdas de kCell) ---
         int primerDia = diaSemanaPrimero(navAnio, navMes);
         int totalDias = diasEnMes(navAnio, navMes);
         for (int i = 0; i < primerDia; ++i) {
-            ImGui::Dummy(ImVec2(kCell, 26));
+            ImGui::Dummy(ImVec2(kCell, 30));
             ImGui::SameLine(0, 0);
         }
         for (int dia = 1; dia <= totalDias; ++dia) {
             bool esElegido = (dia == d && navMes == m && navAnio == y);
             char lbl[8]; std::snprintf(lbl, sizeof(lbl), "%d", dia);
             if (esElegido) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-            if (ImGui::Button(lbl, ImVec2(kCell, 26))) {
+            if (ImGui::Button(lbl, ImVec2(kCell, 30))) {
                 std::snprintf(buf, bufSize, "%04d-%02d-%02d", navAnio, navMes, dia);
                 ImGui::CloseCurrentPopup();
             }
