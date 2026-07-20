@@ -497,15 +497,25 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
 
     // Cabecera: titulo + badge.
     ImGui::TextWrapped("%s", t.titulo.c_str());
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 90);
-    if (historial) {
-        if (t.eliminada) badge("Eliminada", pal.badgeVencida);
-        else             badge("Completada", pal.badge);
-    } else {
-        int r = diasRestantes(t.fechaLimite);
-        if (r < 0) badge("Vencida", pal.badgeVencida);
-        else if (r == 0) badge("Hoy", pal.badgeUrgente);
-        else { char b[32]; std::snprintf(b, sizeof(b), "%d dia(s)", r); badge(b, (r <= 1) ? pal.badgeUrgente : pal.badge); }
+    {
+        // Se decide primero el texto/color del badge, y se calcula su ancho
+        // REAL (igual formula que dentro de badge()) para posicionarlo. Antes
+        // se usaba un offset fijo (-90) que alcanzaba para "Hoy"/"Vencida" pero
+        // "Eliminada"/"Completada" (mas largos, y aun mas con la fuente de
+        // 21px) se salian del borde de la tarjeta y se veian cortados.
+        const char* lbl; Col col; char buf[32];
+        if (historial) {
+            if (t.eliminada) { lbl = "Eliminada"; col = pal.badgeVencida; }
+            else             { lbl = "Completada"; col = pal.badge; }
+        } else {
+            int r = diasRestantes(t.fechaLimite);
+            if (r < 0)       { lbl = "Vencida"; col = pal.badgeVencida; }
+            else if (r == 0) { lbl = "Hoy"; col = pal.badgeUrgente; }
+            else { std::snprintf(buf, sizeof(buf), "%d dia(s)", r); lbl = buf; col = (r <= 1) ? pal.badgeUrgente : pal.badge; }
+        }
+        float badgeW = ImGui::CalcTextSize(lbl).x + 16.0f; // pad.x*2 de badge()
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - badgeW);
+        badge(lbl, col);
     }
 
     ImGui::PushStyleColor(ImGuiCol_Text, v4(pal.fgDim));
