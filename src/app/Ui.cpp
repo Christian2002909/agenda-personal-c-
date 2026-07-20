@@ -99,9 +99,14 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize, const Theme
         ImGui::GetStateStorage()->SetInt(ImGui::GetID("navAnio"), y);
         ImGui::GetStateStorage()->SetInt(ImGui::GetID("navMes"), m);
     }
-    // Ancho fijo EN CADA FRAME: sin esto el popup se estiraba a lo ancho porque
-    // el SameLine(GetWindowWidth()-34) retroalimentaba el ancho de la ventana.
-    ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(260, 520));
+    // Ancho del popup ajustado EXACTO a las 7 columnas + relleno, para que la
+    // grilla quede centrada y sin hueco a un lado. (Ademas evita el estiramiento
+    // que causaba el SameLine(GetWindowWidth()-34).)
+    const float kCell  = 30.0f;                 // ancho/columna de cada dia
+    const float kGridW = 7.0f * kCell;          // ancho total de la grilla
+    const float kPad   = ImGui::GetStyle().WindowPadding.x;
+    const float kPopW  = kGridW + 2.0f * kPad;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(kPopW, 0), ImVec2(kPopW, 560));
     if (ImGui::BeginPopup("calPopup")) {
         // Fondo solido del calendario: evita que el contenido del modal de atras
         // se transparente a traves del popup.
@@ -109,49 +114,51 @@ static void selectorFecha(const char* id, char* buf, size_t bufSize, const Theme
             ImDrawList* pdl = ImGui::GetWindowDrawList();
             ImVec2 a = ImGui::GetWindowPos();
             ImVec2 sz = ImGui::GetWindowSize();
-            ImVec2 b = ImVec2(a.x + sz.x, a.y + sz.y);
             ImVec4 pf = pal.isDark ? ImVec4(0.14f,0.14f,0.18f,1.0f)
                                    : ImVec4(0.98f,0.98f,1.00f,1.0f);
-            pdl->AddRectFilled(a, b, ImGui::ColorConvertFloat4ToU32(pf), ImGui::GetStyle().PopupRounding);
+            pdl->AddRectFilled(a, ImVec2(a.x+sz.x, a.y+sz.y),
+                ImGui::ColorConvertFloat4ToU32(pf), ImGui::GetStyle().PopupRounding);
         }
         ImGuiStorage* st = ImGui::GetStateStorage();
         int navAnio = st->GetInt(ImGui::GetID("navAnio"), y);
         int navMes  = st->GetInt(ImGui::GetID("navMes"), m);
 
+        const float x0 = ImGui::GetCursorPosX();  // borde izquierdo del contenido
+
+        // --- Barra de mes: "<" a la izq, mes centrado, ">" a la der ---
         if (ImGui::SmallButton("<")) { navMes--; if (navMes < 1) { navMes = 12; navAnio--; } }
-        ImGui::SameLine(0, 8);
-        ImGui::Text("%s %d", kMeses[navMes-1], navAnio);
-        ImGui::SameLine(ImGui::GetWindowWidth() - 34);
+        char tit[40]; std::snprintf(tit, sizeof(tit), "%s %d", kMeses[navMes-1], navAnio);
+        float tw = ImGui::CalcTextSize(tit).x;
+        ImGui::SameLine(); ImGui::SetCursorPosX(x0 + (kGridW - tw) * 0.5f);
+        ImGui::TextUnformatted(tit);
+        float bw = ImGui::CalcTextSize(">").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        ImGui::SameLine(); ImGui::SetCursorPosX(x0 + kGridW - bw);
         if (ImGui::SmallButton(">")) { navMes++; if (navMes > 12) { navMes = 1; navAnio++; } }
         st->SetInt(ImGui::GetID("navAnio"), navAnio);
         st->SetInt(ImGui::GetID("navMes"), navMes);
 
         ImGui::Spacing();
-        // Encabezado de dias alineado en columnas de 28px (igual que la grilla),
-        // con el nombre centrado en cada columna.
-        {
-            const float colW = 28.0f;
-            float x0 = ImGui::GetCursorPosX();
-            for (int i = 0; i < 7; ++i) {
-                float tw = ImGui::CalcTextSize(kDiasSemana[i]).x;
-                ImGui::SetCursorPosX(x0 + i * colW + (colW - tw) * 0.5f);
-                ImGui::TextDisabled("%s", kDiasSemana[i]);
-                if (i < 6) ImGui::SameLine();
-            }
+        // --- Encabezado de dias, centrado en cada columna de kCell ---
+        for (int i = 0; i < 7; ++i) {
+            float dw = ImGui::CalcTextSize(kDiasSemana[i]).x;
+            ImGui::SetCursorPosX(x0 + i * kCell + (kCell - dw) * 0.5f);
+            ImGui::TextDisabled("%s", kDiasSemana[i]);
+            if (i < 6) ImGui::SameLine();
         }
         ImGui::NewLine();
 
+        // --- Grilla de dias (cada fila arranca en x0, celdas de kCell) ---
         int primerDia = diaSemanaPrimero(navAnio, navMes);
         int totalDias = diasEnMes(navAnio, navMes);
         for (int i = 0; i < primerDia; ++i) {
-            ImGui::Dummy(ImVec2(28, 24));
+            ImGui::Dummy(ImVec2(kCell, 26));
             ImGui::SameLine(0, 0);
         }
         for (int dia = 1; dia <= totalDias; ++dia) {
             bool esElegido = (dia == d && navMes == m && navAnio == y);
             char lbl[8]; std::snprintf(lbl, sizeof(lbl), "%d", dia);
             if (esElegido) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-            if (ImGui::Button(lbl, ImVec2(28, 24))) {
+            if (ImGui::Button(lbl, ImVec2(kCell, 26))) {
                 std::snprintf(buf, bufSize, "%04d-%02d-%02d", navAnio, navMes, dia);
                 ImGui::CloseCurrentPopup();
             }
