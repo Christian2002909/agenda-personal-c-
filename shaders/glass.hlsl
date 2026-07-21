@@ -40,8 +40,9 @@ VSOut VSGlass(uint id : SV_VertexID) {
     return o;
 }
 
-Texture2D    blurTex : register(t0);   // fondo desenfocado (pantalla completa)
-SamplerState samp0   : register(s0);
+Texture2D    blurTex     : register(t0);   // fondo desenfocado (pantalla completa)
+Texture2D    bgSharpTex  : register(t1);   // fondo NITIDO (para el look "agua pura")
+SamplerState samp0       : register(s0);
 
 // SDF de rectangulo redondeado: <0 dentro, 0 en el borde, >0 fuera. 'p' es la
 // posicion relativa al centro; 'b' es media dimension.
@@ -77,14 +78,28 @@ float4 PSGlass(VSOut i) : SV_Target {
         return float4(0.0, 0.0, 0.0, shadow * (1.0 - cov));
     }
 
-    // Banda de refraccion: concentrada cerca del borde (rim), 0 en el centro.
-    float edgeWidth = 18.0;
-    float t = saturate((d + edgeWidth) / edgeWidth);   // 0 interior -> 1 en el borde
+    // --- Refraccion "agua pura" (lente de domo, eta = 1/1.33) ---------------
+    // Se trata el panel como un domo: plano en el centro y curvado hacia el
+    // borde. La normal del domo apunta radialmente hacia afuera y crece con la
+    // distancia al centro (curvature=1.0), asi la luz se dobla suave en el
+    // centro y mas fuerte cerca del borde (magnificacion tipo lente de agua).
+    float2 local = (p - center) / mitad;               // -1..1 dentro del panel
+    float  rr    = saturate(length(local));
+    float  curvature = pow(rr, 1.0);                    // agua pura: curvature 1.0
+    float2 domeN = normalize(local + 1e-5) * curvature;
+    // Normal 3D del domo (el factor controla la inclinacion ~ edgeSharpness).
+    float3 N3 = normalize(float3(domeN * 2.1, 1.0));
+    float3 I3 = float3(0.0, 0.0, -1.0);                 // rayo de vista hacia la pantalla
+    float3 R3 = refract(I3, N3, 1.0 / 1.33);           // eta del agua
     float2 uv = p / resolution;
-    float2 refract = n * (t * t) * (refractPx / resolution);
-    float3 bg = blurTex.Sample(samp0, uv + refract).rgb;
+    float2 refr = R3.xy * 0.07;                         // distortionStrength (mas "liquid glass")
 
-    // Tinte translucido del vidrio.
+    // Agua = clara: mayormente NITIDO con un toque de desenfoque (no esmerilado).
+    float3 sharp   = bgSharpTex.Sample(samp0, uv + refr).rgb;
+    float3 blurred = blurTex.Sample(samp0, uv + refr * 0.6).rgb;
+    float3 bg = lerp(sharp, blurred, 0.35);
+
+    // Tinte translucido del vidrio (suave, para no perder legibilidad).
     float3 col = lerp(bg, tint.rgb, tint.a);
 
     // Ligero degradado vertical de luz (arriba mas claro), como el CSS.
