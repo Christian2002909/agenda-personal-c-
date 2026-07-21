@@ -221,14 +221,13 @@ static void badge(const char* texto, const Col& color) {
     ImGui::Dummy(ImVec2(ts.x + pad.x*2, ts.y + pad.y*2));
 }
 
-// Checkbox de tamano fijo (no depende del tamano de fuente cargado, que es 21px
-// y hacia que ImGui::Checkbox por defecto dibujara una casilla enorme —
-// ImGui calcula el lado de la casilla como FontSize + FramePadding.y*2). Se
-// dibuja a mano, igual que badge()/dia del calendario, para desacoplar el
-// tamano de la casilla del tamano del texto de la etiqueta.
+// Checkbox de tamano fijo (ImGui::Checkbox por defecto dibuja una casilla del
+// alto FontSize + FramePadding.y*2, ligada al tamano de fuente). Se dibuja a
+// mano, igual que badge()/dia del calendario, para desacoplar el tamano de la
+// casilla del tamano del texto de la etiqueta.
 static bool casillaCompacta(const char* label, bool* v, const ThemePalette& pal) {
     ImGui::PushID(label);
-    const float box = 18.0f;
+    const float box = 15.0f;
     float y0 = ImGui::GetCursorPosY();
     ImVec2 p0 = ImGui::GetCursorScreenPos();
     bool clic = ImGui::InvisibleButton("chk", ImVec2(box, box));
@@ -239,7 +238,7 @@ static bool casillaCompacta(const char* label, bool* v, const ThemePalette& pal)
     ImVec2 p1(p0.x + box, p0.y + box);
     if (*v) {
         ImU32 colBg = ImGui::ColorConvertFloat4ToU32(v4(pal.accent));
-        dl->AddRectFilled(p0, p1, colBg, 5.0f);
+        dl->AddRectFilled(p0, p1, colBg, 4.0f);
         ImU32 colChk = IM_COL32(255, 255, 255, 255);
         ImVec2 a(p0.x + box * 0.22f, p0.y + box * 0.52f);
         ImVec2 b(p0.x + box * 0.42f, p0.y + box * 0.74f);
@@ -248,13 +247,13 @@ static bool casillaCompacta(const char* label, bool* v, const ThemePalette& pal)
         dl->AddLine(b, c, colChk, 2.2f);
     } else {
         ImU32 colBg = ImGui::ColorConvertFloat4ToU32(v4(pal.inputBg));
-        dl->AddRectFilled(p0, p1, colBg, 5.0f);
+        dl->AddRectFilled(p0, p1, colBg, 4.0f);
         ImU32 colBorde = ImGui::ColorConvertFloat4ToU32(v4(pal.borde));
-        dl->AddRect(p0, p1, colBorde, 5.0f, 0, 1.3f);
+        dl->AddRect(p0, p1, colBorde, 4.0f, 0, 1.3f);
     }
     if (hover) {
         ImU32 colHov = ImGui::ColorConvertFloat4ToU32(v4(pal.accent));
-        dl->AddRect(p0, p1, colHov, 5.0f, 0, 1.5f);
+        dl->AddRect(p0, p1, colHov, 4.0f, 0, 1.5f);
     }
 
     ImGui::SameLine();
@@ -340,8 +339,11 @@ void UiApp::build(int width, int height, float timeSec) {
     ImGuiStyle& st = ImGui::GetStyle();
     st.WindowRounding = 20; st.ChildRounding = 18; st.FrameRounding = 10;
     st.PopupRounding = 16; st.GrabRounding = 8; st.WindowBorderSize = 0;
-    st.WindowPadding = ImVec2(16, 14); st.FramePadding = ImVec2(8, 5);
-    st.ItemSpacing = ImVec2(8, 9);
+    // FramePadding: relleno interno de campos y botones. Da aire entre el texto
+    // y el borde del control (evita que las etiquetas queden pegadas al borde),
+    // y una altura de input comoda como en la version Electron.
+    st.WindowPadding = ImVec2(16, 14); st.FramePadding = ImVec2(10, 6);
+    st.ItemSpacing = ImVec2(8, 8);
     // Borde visible en campos/botones/popups: sin esto se pierden contra el
     // fondo translucido del vidrio (todo se veia "plano").
     st.FrameBorderSize = 1.0f;
@@ -381,11 +383,37 @@ void UiApp::build(int width, int height, float timeSec) {
     else if (pos == "arriba") { cy = pad*2 + SIDEBAR_H; ch = (float)height - cy - pad; }
     else if (pos == "abajo") { cy = pad; ch = (float)height - SIDEBAR_H - pad*3; }
 
+    // Guardar el rectangulo de contenido para ubicar/clampear las tarjetas libres.
+    contentX_ = cx; contentY_ = cy; contentW_ = cw; contentH_ = ch;
+
     ImGui::SetNextWindowPos(ImVec2(cx, cy), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(cw, ch), ImGuiCond_Always);
     ImGui::Begin("##contenido", nullptr,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoBackground);
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollWithMouse);
+
+    // --- Scroll suave (estilo Apple) -----------------------------------------
+    // La rueda mueve un "objetivo" y el scroll real se acerca a el con
+    // desaceleracion, en vez de saltar de golpe. Con NoScrollWithMouse ImGui no
+    // aplica su propio salto, asi que aca controlamos todo el desplazamiento.
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        float cur = ImGui::GetScrollY();
+        // Si algo externo movio el scroll (barra lateral, cambio de contenido),
+        // adoptar ese valor para no pelear con el.
+        if (fabsf(cur - scrollLastApplied_) > 1.0f) scrollTarget_ = cur;
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && io.MouseWheel != 0.0f)
+            scrollTarget_ -= io.MouseWheel * 70.0f;    // px por muesca (mas lento)
+        float maxY = ImGui::GetScrollMaxY();
+        scrollTarget_ = std::min(std::max(scrollTarget_, 0.0f), maxY);
+        // Suavizado exponencial independiente del framerate (tau ~ 0.09 s).
+        float k = 1.0f - expf(-io.DeltaTime / 0.16f);   // glide mas largo/fluido
+        float ny = cur + (scrollTarget_ - cur) * k;
+        if (fabsf(scrollTarget_ - ny) < 0.5f) ny = scrollTarget_;
+        ImGui::SetScrollY(ny);
+        scrollLastApplied_ = ny;
+    }
 
     if (vista_ == 0) vistaAgenda();
     else if (vista_ == 1) vistaHistorial();
@@ -401,6 +429,11 @@ void UiApp::build(int width, int height, float timeSec) {
     }
 
     ImGui::End();
+
+    // Tarjetas flotantes (ventanas libres) por encima del contenido. Se dibujan
+    // FUERA de "##contenido" para ser ventanas top-level arrastrables.
+    if (vista_ == 0)      dibujarTarjetasFlotantes(false);
+    else if (vista_ == 1) dibujarTarjetasFlotantes(true);
 
     if (modalAbierto_) modalTarea();
 }
@@ -489,78 +522,144 @@ void UiApp::vistaAgenda() {
     }
     ImGui::PopStyleColor(2);
     ImGui::PopStyleVar(2);
-    ImGui::TextDisabled("Arrastra las tarjetas para reordenarlas.");
+    ImGui::TextDisabled("Arrastra una tarjeta y soltala donde quieras para reordenarlas.");
     ImGui::Spacing();
 
-    // Tareas activas ordenadas.
-    std::vector<Tarea> activas;
-    for (auto& t : tareas_) if (!t.completada && !t.eliminada) activas.push_back(t);
-    std::sort(activas.begin(), activas.end(), [](const Tarea& a, const Tarea& b){
-        if (a.orden != b.orden) return a.orden < b.orden;
-        return a.fechaLimite < b.fechaLimite;
-    });
-
-    if (activas.empty()) {
+    // Mensaje si no hay tareas (las tarjetas en si son ventanas flotantes que se
+    // dibujan aparte, en dibujarTarjetasFlotantes).
+    bool hayActivas = false;
+    for (auto& t : tareas_) if (!t.completada && !t.eliminada) { hayActivas = true; break; }
+    if (!hayActivas)
         ImGui::TextDisabled("No tienes tareas pendientes. Crea una con \"+ Nueva tarea\".");
-        return;
+}
+
+// Dibuja las tarjetas de tareas (historial=false) o de historial (historial=true)
+// como VENTANAS FLOTANTES en una rejilla ordenada. Se pueden arrastrar libremente
+// (siguen al cursor, se disfruta el liquid glass) y al SOLTAR se reordenan: la
+// tarjeta cae en el slot mas cercano a donde la dejaste y las demas se corren.
+void UiApp::dibujarTarjetasFlotantes(bool historial) {
+    std::vector<Tarea> lista;
+    for (auto& t : tareas_) {
+        bool enHist = (t.completada || t.eliminada);
+        if (enHist == historial) lista.push_back(t);
+    }
+    if (lista.empty()) { dragId_.clear(); return; }
+
+    // Orden visual: por 'orden' (tareas) u 'ordenHist' (historial).
+    if (!historial)
+        std::sort(lista.begin(), lista.end(), [](const Tarea& a, const Tarea& b){
+            if (a.orden != b.orden) return a.orden < b.orden;
+            return a.fechaLimite < b.fechaLimite; });
+    else
+        std::sort(lista.begin(), lista.end(), [](const Tarea& a, const Tarea& b){
+            if (a.ordenHist != b.ordenHist) return a.ordenHist < b.ordenHist;
+            const std::string& ka = !a.completadaEn.empty() ? a.completadaEn : a.eliminadaEn;
+            const std::string& kb = !b.completadaEn.empty() ? b.completadaEn : b.eliminadaEn;
+            return ka > kb; });
+
+    // Ancho adaptativo: el minimo que permita que la fila de botones entre sin
+    // cortarse (distinto en tareas vs historial por las etiquetas).
+    const float BPAD = 10.0f, WPAD = 20.0f;
+    const float SP   = ImGui::GetStyle().ItemSpacing.x;
+    auto btnW = [&](const char* s){ return ImGui::CalcTextSize(s).x + 2.0f * BPAD; };
+    float rowW = historial
+        ? btnW("Reabrir") + SP + btnW("Eliminar definitivamente")
+        : btnW("Completar") + SP + btnW("Editar") + SP + btnW("Eliminar");
+    const float CARD_W = std::max(260.0f, rowW + 2.0f * WPAD + 8.0f);
+    const float GAP = 28.0f, ROW_H = 240.0f, HEADER_H = 96.0f;
+    const float ax = contentX_, ay = contentY_, aw = contentW_, ah = contentH_;
+    const float startX = ax + 4.0f, startY = ay + HEADER_H;
+    const int   perRow = std::max(1, (int)((aw - 4.0f) / (CARD_W + GAP)));
+    auto slotPos = [&](int i){ int col = i % perRow, row = i / perRow;
+        return ImVec2(startX + col * (CARD_W + GAP), startY + row * (ROW_H + GAP)); };
+
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const int n = (int)lista.size();
+
+    // El vidrio de la tarjeta arrastrada se registra al final (queda al frente).
+    bool hayGlassDrag = false; GlassPanel glassDrag{};
+
+    for (int i = 0; i < n; ++i) {
+        const Tarea& t = lista[i];
+        bool isDragged = (dragId_ == t.id);
+
+        // Posicion: la arrastrada sigue al cursor; las demas van a su slot.
+        ImVec2 pos = isDragged ? ImVec2(mouse.x - dragGrabX_, mouse.y - dragGrabY_) : slotPos(i);
+        pos.x = std::min(std::max(pos.x, ax), std::max(ax, ax + aw - CARD_W));
+        pos.y = std::min(std::max(pos.y, ay), std::max(ay, ay + ah - 60.0f));
+
+        ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(CARD_W, 0), ImVec2(CARD_W, 1e9f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 18));
+        std::string wname = (historial ? "##hcard_" : "##card_") + t.id;
+        ImGui::Begin(wname.c_str(), nullptr,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);   // NoMove: posicionamos nosotros
+
+        ImVec2 wpos = ImGui::GetWindowPos();
+        ImVec2 wsz  = ImGui::GetWindowSize();
+        GlassPanel gp = panelBase(wpos.x, wpos.y, wsz.x, wsz.y, 13.0f);
+        if (isDragged) { hayGlassDrag = true; glassDrag = gp; }
+        else registrarGlass(gp);
+
+        dibujarTarjeta(t, historial, i);
+        ImGui::End();
+        ImGui::PopStyleVar();
+
+        // Iniciar arrastre: presionar sobre el cuerpo de la tarjeta (area vacia,
+        // no un boton) inicia el arrastre libre.
+        bool overCard = (mouse.x >= wpos.x && mouse.x <= wpos.x + wsz.x &&
+                         mouse.y >= wpos.y && mouse.y <= wpos.y + wsz.y);
+        if (dragId_.empty() && overCard && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+            !ImGui::IsAnyItemHovered()) {
+            dragId_    = t.id;
+            dragGrabX_ = mouse.x - wpos.x;
+            dragGrabY_ = mouse.y - wpos.y;
+        }
     }
 
-    float avail = ImGui::GetContentRegionAvail().x;
-    int cols = std::max(1, (int)(avail / 300.0f));
-    float gap = 14.0f;
-    float cardW = (avail - gap * (cols - 1)) / cols;
+    if (hayGlassDrag) registrarGlass(glassDrag);   // vidrio arrastrado, al frente
 
-    for (int i = 0; i < (int)activas.size(); ++i) {
-        if (i % cols != 0) ImGui::SameLine(0, gap);
-        ImGui::PushID(i);
-        // Relleno interno generoso (igual que los paneles de Configuracion): el
-        // WindowPadding global (16,14) se ve pegado a la esquina en una tarjeta;
-        // AlwaysUseWindowPadding es necesario ademas para que un child SIN borde
-        // respete el WindowPadding en vez de ignorarlo. Alto automatico (se
-        // ajusta al contenido, como el programa original) en vez de fijo.
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 20));
-        ImGui::BeginChild("card", ImVec2(cardW, 0),
-                          ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY,
-                          ImGuiWindowFlags_NoScrollbar);
-        // Registrar el vidrio con la posicion/tamaño reales del child.
-        ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
-        registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
-
-        dibujarTarjeta(activas[i], false, i);
-
-        // Drag & drop para reordenar.
-        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
-            ImGui::SetDragDropPayload("CARD", &i, sizeof(int));
-            ImGui::TextUnformatted(activas[i].titulo.c_str());
-            ImGui::EndDragDropSource();
-        }
-        if (ImGui::BeginDragDropTarget()) {
-            if (const ImGuiPayload* p = ImGui::AcceptDragDropPayload("CARD")) {
-                int from = *(const int*)p->Data;
-                int to = i;
-                if (from != to && from >= 0 && from < (int)activas.size()) {
-                    // Reasignar 'orden' segun el nuevo orden visual.
-                    Tarea movida = activas[from];
-                    activas.erase(activas.begin()+from);
-                    activas.insert(activas.begin()+to, movida);
-                    for (int k = 0; k < (int)activas.size(); ++k) {
-                        Tarea t = activas[k];
-                        if (t.orden != k) { t.orden = k; store_->saveTarea(t); }
-                    }
-                    recargar();
-                }
+    // Soltar: reordenar segun el slot mas cercano al centro de la arrastrada.
+    if (!dragId_.empty() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        int from = -1;
+        for (int i = 0; i < n; ++i) if (lista[i].id == dragId_) { from = i; break; }
+        if (from >= 0) {
+            float cx = (mouse.x - dragGrabX_) + CARD_W * 0.5f;
+            float cy = (mouse.y - dragGrabY_) + ROW_H * 0.5f;
+            int to = 0; float best = 1e30f;
+            for (int i = 0; i < n; ++i) {
+                ImVec2 s = slotPos(i);
+                float dx = cx - (s.x + CARD_W * 0.5f), dy = cy - (s.y + ROW_H * 0.5f);
+                float d = dx * dx + dy * dy;
+                if (d < best) { best = d; to = i; }
             }
-            ImGui::EndDragDropTarget();
+            if (to != from) {
+                Tarea moved = lista[from];
+                lista.erase(lista.begin() + from);
+                lista.insert(lista.begin() + to, moved);
+            }
+            // Renumerar el orden y persistir los que cambiaron.
+            for (int i = 0; i < n; ++i)
+                for (auto& tt : tareas_)
+                    if (tt.id == lista[i].id) {
+                        if (!historial) { if (tt.orden != i)     { tt.orden = i;     store_->saveTarea(tt); } }
+                        else            { if (tt.ordenHist != i) { tt.ordenHist = i; store_->saveTarea(tt); } }
+                        break;
+                    }
         }
-        ImGui::EndChild();
-        ImGui::PopStyleVar();
-        ImGui::PopID();
+        dragId_.clear();
     }
 }
 
 void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
     ThemePalette pal = resolverPaleta(config_);
     ImGui::PushStyleColor(ImGuiCol_Text, v4(pal.fg));
+
+    // La tarjeta entera es una ventana arrastrable (ver dibujarTarjetasFlotantes):
+    // arrastrar sobre un area vacia la mueve; los botones siguen clickeables.
 
     // Cabecera: titulo (con mas peso visual que el resto del texto) + badge.
     ImGui::SetWindowFontScale(1.15f);
@@ -570,8 +669,8 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
         // Se decide primero el texto/color del badge, y se calcula su ancho
         // REAL (igual formula que dentro de badge()) para posicionarlo. Antes
         // se usaba un offset fijo (-90) que alcanzaba para "Hoy"/"Vencida" pero
-        // "Eliminada"/"Completada" (mas largos, y aun mas con la fuente de
-        // 21px) se salian del borde de la tarjeta y se veian cortados.
+        // "Eliminada"/"Completada" (mas largos) se salian del borde de la
+        // tarjeta y se veian cortados.
         const char* lbl; Col col; char buf[32];
         if (historial) {
             if (t.eliminada) { lbl = "Eliminada"; col = pal.badgeVencida; }
@@ -617,11 +716,12 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
 
     // Botones tipo "pildora" (fondo + relleno propio), no solo texto plano.
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(13, 6));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 6));   // BPAD (coincide con el ancho adaptativo de la tarjeta)
     if (historial) {
         if (ImGui::Button("Reabrir")) {
             Tarea nt = t; nt.completada = false; nt.eliminada = false;
-            nt.orden = 0;
+            nt.orden = 0; nt.ordenHist = -1;
+            nt.posX = -1.0f; nt.posY = -1.0f;   // ubicacion fresca en la vista destino
             guardarTareaConSync(nt);
         }
         ImGui::SameLine();
@@ -633,6 +733,7 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
     } else {
         if (ImGui::Button("Completar")) {
             Tarea nt = t; nt.completada = true; nt.completadaEn = nowIso();
+            nt.posX = -1.0f; nt.posY = -1.0f;   // ubicacion fresca en el historial
             guardarTareaConSync(nt);
         }
         ImGui::SameLine();
@@ -650,6 +751,7 @@ void UiApp::dibujarTarjeta(const Tarea& t, bool historial, int /*indice*/) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,1,1,1));
         if (ImGui::Button("Eliminar")) {
             Tarea nt = t; nt.eliminada = true; nt.eliminadaEn = nowIso();
+            nt.posX = -1.0f; nt.posY = -1.0f;   // ubicacion fresca en el historial
             guardarTareaConSync(nt);
         }
         ImGui::PopStyleColor(3);
@@ -664,37 +766,14 @@ void UiApp::vistaHistorial() {
     ImGui::TextUnformatted("Historial");
     ImGui::SetWindowFontScale(1.0f);
     ImGui::TextDisabled("Tareas completadas o eliminadas. Puedes reabrirlas o borrarlas para siempre.");
+    ImGui::TextDisabled("Arrastra una tarjeta y soltala donde quieras para reordenarlas.");
     ImGui::Spacing();
 
-    std::vector<Tarea> hist;
-    for (auto& t : tareas_) if (t.completada || t.eliminada) hist.push_back(t);
-    std::sort(hist.begin(), hist.end(), [](const Tarea& a, const Tarea& b){
-        const std::string& ka = !a.completadaEn.empty() ? a.completadaEn : a.eliminadaEn;
-        const std::string& kb = !b.completadaEn.empty() ? b.completadaEn : b.eliminadaEn;
-        return ka > kb;
-    });
-
-    if (hist.empty()) { ImGui::TextDisabled("Aun no hay nada en el historial."); return; }
-
-    float avail = ImGui::GetContentRegionAvail().x;
-    int cols = std::max(1, (int)(avail / 300.0f));
-    float gap = 14.0f;
-    float cardW = (avail - gap*(cols-1)) / cols;
-    for (int i = 0; i < (int)hist.size(); ++i) {
-        if (i % cols != 0) ImGui::SameLine(0, gap);
-        ImGui::PushID(1000 + i);
-        // Mismo relleno generoso que las tarjetas de "Mis tareas". Alto automatico.
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24, 20));
-        ImGui::BeginChild("hcard", ImVec2(cardW, 0),
-                          ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY,
-                          ImGuiWindowFlags_NoScrollbar);
-        ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
-        registrarGlass(panelBase(wp.x, wp.y, ws.x, ws.y, 13.0f));
-        dibujarTarjeta(hist[i], true, i);
-        ImGui::EndChild();
-        ImGui::PopStyleVar();
-        ImGui::PopID();
-    }
+    // Las tarjetas son ventanas flotantes (dibujarTarjetasFlotantes(true)); aca
+    // solo el mensaje si el historial esta vacio.
+    bool hayHist = false;
+    for (auto& t : tareas_) if (t.completada || t.eliminada) { hayHist = true; break; }
+    if (!hayHist) ImGui::TextDisabled("Aun no hay nada en el historial.");
 }
 
 // ---------------------------------------------------------------------------

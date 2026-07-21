@@ -69,9 +69,9 @@ ThemePalette resolverPaleta(const Config& cfg) {
         p.inputBg   = rgba(255,255,255,0.88f);
         p.hoverBg   = rgba(0,0,0,0.05f);
         p.borde     = rgba(0,0,0,0.14f);
-        // Panel de vidrio bastante mas definido sobre el degradado por defecto
-        // (antes 0.28 se veia "lavado" y se fundia con el fondo).
-        p.glassBg   = rgba(255,255,255,0.55f);
+        // Vidrio "agua pura": tinte bajo para que el fondo refractado se vea
+        // claro a traves del panel (antes 0.55 se veia lechoso).
+        p.glassBg   = rgba(255,255,255,0.34f);
         p.glassBorde= rgba(255,255,255,0.72f);
         p.glassRim  = rgba(255,255,255,0.78f);
     } else {
@@ -81,7 +81,7 @@ ThemePalette resolverPaleta(const Config& cfg) {
         p.inputBg   = rgba(255,255,255,0.08f);
         p.hoverBg   = rgba(255,255,255,0.08f);
         p.borde     = rgba(255,255,255,0.14f);
-        p.glassBg   = rgba(40,42,60,0.50f);
+        p.glassBg   = rgba(40,42,60,0.36f);
         p.glassBorde= rgba(255,255,255,0.16f);
         p.glassRim  = rgba(255,255,255,0.35f);
     }
@@ -89,13 +89,13 @@ ThemePalette resolverPaleta(const Config& cfg) {
     // Sobre foto o color solido: vidrio mas opaco y texto con sombra (themes.css).
     if (p.fondoConFoto) {
         if (!p.isDark) {
-            p.glassBg   = rgba(255,255,255,0.60f);
+            p.glassBg   = rgba(255,255,255,0.42f);
             p.glassBorde= rgba(255,255,255,0.75f);
             p.glassRim  = rgba(255,255,255,0.82f);
             p.panelSolid= rgba(255,255,255,0.65f);
             p.inputBg   = rgba(255,255,255,0.82f);
         } else {
-            p.glassBg   = rgba(15,15,30,0.62f);
+            p.glassBg   = rgba(15,15,30,0.46f);
             p.glassBorde= rgba(255,255,255,0.18f);
             p.glassRim  = rgba(255,255,255,0.30f);
             p.panelSolid= rgba(20,20,40,0.65f);

@@ -51,6 +51,8 @@ private:
     void vistaConfig();
     void modalTarea();
     void dibujarTarjeta(const Tarea& t, bool historial, int indice);
+    // Tarjetas flotantes (ventanas libres arrastrables) de tareas/historial.
+    void dibujarTarjetasFlotantes(bool historial);
 
     // Operaciones de datos (+ sincronizacion en segundo plano).
     void recargar();
@@ -97,8 +99,17 @@ private:
     std::vector<GlassPanel> panelesCur_;
     std::vector<GlassPanel> panelesPrev_;
 
-    // Reordenamiento (drag & drop).
-    int arrastreDesde_ = -1;
+    // Reordenar por arrastre libre: se arrastra la tarjeta suelta y al soltar se
+    // reubica en la posicion (slot) mas cercana, corriendo a las demas.
+    std::string dragId_;                     // id de la tarjeta que se arrastra ("" = ninguna)
+    float dragGrabX_ = 0.0f, dragGrabY_ = 0.0f;  // punto de agarre dentro de la tarjeta
+
+    // Scroll suave (estilo Apple) de la ventana de contenido.
+    float scrollTarget_      = 0.0f;   // destino al que se acerca el scroll
+    float scrollLastApplied_ = 0.0f;   // ultimo valor que fijamos (para detectar la barra)
+
+    // Rectangulo del area de contenido (para ubicar/clampear las tarjetas libres).
+    float contentX_ = 0.0f, contentY_ = 0.0f, contentW_ = 0.0f, contentH_ = 0.0f;
 
     // Actualizacion de conexion Google llegada desde el hilo de autenticacion.
     std::mutex pendMtx_;

@@ -283,11 +283,13 @@ void GlassRenderer::drawPanel(ID3D11RenderTargetView* backRTV, UINT w, UINT h,
     ctx_->PSSetShader(psGlass_.Get(), nullptr, 0);
     ctx_->PSSetConstantBuffers(0, 1, cbGlass_.GetAddressOf());
     ctx_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
-    ctx_->PSSetShaderResources(0, 1, blurTex_.srv.GetAddressOf());
+    // t0 = fondo desenfocado, t1 = fondo nitido (para el look "agua pura").
+    ID3D11ShaderResourceView* srvs[2] = { blurTex_.srv.Get(), bgTex_.srv.Get() };
+    ctx_->PSSetShaderResources(0, 2, srvs);
     ctx_->Draw(4, 0);
 
-    ID3D11ShaderResourceView* nulo[1] = { nullptr };
-    ctx_->PSSetShaderResources(0, 1, nulo);
+    ID3D11ShaderResourceView* nulo[2] = { nullptr, nullptr };
+    ctx_->PSSetShaderResources(0, 2, nulo);
 }
 
 } // namespace agenda

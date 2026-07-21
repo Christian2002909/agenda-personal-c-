@@ -19,7 +19,10 @@ struct Tarea {
     std::vector<std::string> horarios;    // "HH:MM"
     bool completada = false;
     bool eliminada  = false;
-    int  orden      = 0;
+    int  orden      = 0;                   // (obsoleto) orden manual en "Tareas"; ya no se usa
+    int  ordenHist  = -1;                  // (obsoleto) orden manual en "Historial"; ya no se usa
+    float posX      = -1.0f;               // posicion libre en pantalla (-1 = sin ubicar -> auto-layout)
+    float posY      = -1.0f;
     std::string creadaEn;                 // ISO 8601
     std::string completadaEn;
     std::string eliminadaEn;
@@ -28,7 +31,8 @@ struct Tarea {
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
     Tarea, id, titulo, fechaLimite, notas, avisosPrevios, horarios,
-    completada, eliminada, orden, creadaEn, completadaEn, eliminadaEn, googleEventId)
+    completada, eliminada, orden, ordenHist, posX, posY,
+    creadaEn, completadaEn, eliminadaEn, googleEventId)
 
 // ------------------------------ Configuracion -------------------------------
 struct EmailCfg {
